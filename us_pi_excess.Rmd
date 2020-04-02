@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 if (!require("devtools")) {
   install.packages("devtools")
 }
-devtools::install_github("weinbergerlab/ExcessILI")
+#devtools::install_github("weinbergerlab/ExcessILI")
 ```
 
 ```{r}
@@ -26,6 +26,7 @@ library(cdcfluview)
 
 ```{r}
 pi.data <- pi_mortality(coverage_area='state')
+
 ```
 
 Format and subset
@@ -53,6 +54,97 @@ excess_deaths1.adjusted <-
 
 
 ```{r, echo=T}
- dashboardPlot(excess_deaths1.unadjusted)
+ dashboardPlot(excess_deaths1.adjusted)
 ```
 
+
+## Generate static versions of the plots
+
+### Extract the quantities of interest
+
+Which syndrome do you want to plot, and over what time range?
+```{r}
+syndrome.select <- 'total_pni' #which syndrome do you want to plot?
+n.days<-52  #How many days to plot?
+ds <- excess_deaths1.adjusted
+```
+ 
+Extract the data needed to plot from the results
+```{r}
+
+dates <-
+  ds[[1]][[1]][[1]]$date
+  
+unexplained.cases <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "unexplained.cases")
+
+unexplained.log.rr <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "resid1")
+
+denom <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "denom")
+
+
+upi <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "upi")
+
+lpi <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "lpi")
+
+obs <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "y")
+
+pred<-  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "pred")
+
+```
+
+Generate the plots
+```{r, fig.width=10, fig.height=7}
+
+select.indices <- (length(dates)-n.days):length(dates)
+dates<-dates[select.indices]
+states <- dimnames(pred)[[2]]
+ages <- dimnames(pred)[[3]]
+
+  par(mfrow=c(4,4))
+
+for(i in 1:dim(pred)[2]){
+  for(j in 1:dim(pred)[3]){
+    y.range1<-range(c( pred[select.indices,i,j],obs[select.indices,i,j], upi[select.indices,i,j],0))
+  plot(dates,
+       pred[select.indices,i,j],
+       type='l',
+       col='red',
+       ylim=y.range1,
+       bty='l',
+       ylab='N cases',
+       main=paste(states[i],ages[j]))
+
+  points(dates,
+         obs[select.indices,i,j],
+         type='l',
+         col='black')
+
+  polygon(c(dates,
+            rev(dates)),
+          c(lpi[select.indices,i,j],
+            rev(upi[select.indices,i,j])),
+          col = rgb(1, 0, 0, alpha = 0.1),
+          border = NA)
+  }
+}
+```
