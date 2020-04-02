@@ -14,7 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 if (!require("devtools")) {
   install.packages("devtools")
 }
-devtools::install_github("weinbergerlab/ExcessILI")```
+devtools::install_github("weinbergerlab/ExcessILI")
+```
 
 ```{r}
 library(ExcessILI)
@@ -32,16 +33,19 @@ Format and subset
 pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
 pi.data$state[pi.data$region_name == 'New York City'] <- 'NYC'
 
-pi.data.subset <- pi.data[pi.data$state %in% c('AL','AZ','AR','CA','CO','CT','FL','GA','IL','IN','IA','KY','LA','MD','MA','MI','MN','MO','NV','NJ','NY','NC','OH','OK','OR','PA','SC','TN','TX','UT','VA','WA','WI'),]
+#pi.data.subset <- pi.data[pi.data$state %in% c('AL','AZ','CA','CO','FL','GA','IL','IN','LA','MD','MA','MI','MN','MO','NV','NJ','NY','NC','OH','PA','SC','TN','TX','VA','WA','WI'),]
+
+pi.data.subset <- as.data.frame(pi.data[pi.data$state %in% c('AZ','CA','FL','GA','IL','LA','MI','MN','NJ','NY','OH','PA','TX','VA','WA','WI'),])
+pi.data.subset <-pi.data.subset[order(pi.data.subset$state, pi.data.subset$wk_start),]
 ```
 
 ```{r}
-excess_deaths1.unadjusted <-
+excess_deaths1.adjusted <-
   excessCases(ds = pi.data.subset,
               datevar       = "wk_start",
               statevar      = "state",
               denom.var     = "all_deaths",
-              adj.flu       = "none",
+              adj.flu       = "auto",
               use.syndromes = c("total_pni"),
               extrapolation.date = "2020-03-01",
               time.res='week')
