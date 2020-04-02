@@ -1,0 +1,54 @@
+---
+title: "us P&I mortality"
+author: "Dan Weinberger"
+date: "4/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install package
+```{r}
+if (!require("devtools")) {
+  install.packages("devtools")
+}
+devtools::install_github("weinbergerlab/ExcessILI")```
+
+```{r}
+library(ExcessILI)
+library(cdcfluview)
+```
+
+## Download the mortality data
+
+```{r}
+pi.data <- pi_mortality(coverage_area='state')
+```
+
+Format and subset
+```{r}
+pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
+pi.data$state[pi.data$region_name == 'New York City'] <- 'NYC'
+
+pi.data.subset <- pi.data[pi.data$state %in% c('AL','AZ','AR','CA','CO','CT','FL','GA','IL','IN','IA','KY','LA','MD','MA','MI','MN','MO','NV','NJ','NY','NC','OH','OK','OR','PA','SC','TN','TX','UT','VA','WA','WI'),]
+```
+
+```{r}
+excess_deaths1.unadjusted <-
+  excessCases(ds = pi.data.subset,
+              datevar       = "wk_start",
+              statevar      = "state",
+              denom.var     = "all_deaths",
+              adj.flu       = "none",
+              use.syndromes = c("total_pni"),
+              extrapolation.date = "2020-03-01",
+              time.res='week')
+```
+
+
+```{r, echo=T}
+ dashboardPlot(excess_deaths1.unadjusted)
+```
+
