@@ -72,7 +72,7 @@ ds <- excess_deaths1.adjusted
 Extract the data needed to plot from the results
 ```{r}
 
-dates <-
+dates1 <-
   ds[[1]][[1]][[1]]$date
   
 unexplained.cases <-
@@ -113,10 +113,10 @@ pred<-  excessExtract(ds = ds,
 ```
 
 Generate the plots
-```{r, fig.width=10, fig.height=7}
+```{r, fig.width=8, fig.height=7}
 
-select.indices <- (length(dates)-n.days):length(dates)
-dates<-dates[select.indices]
+select.indices <- (length(dates1)-n.days):length(dates1)
+dates<-dates1[select.indices]
 states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
 
@@ -124,25 +124,25 @@ ages <- dimnames(pred)[[3]]
 
 for(i in 1:dim(pred)[2]){
   for(j in 1:dim(pred)[3]){
-    y.range1<-range(c( pred[select.indices,i,j],obs[select.indices,i,j], upi[select.indices,i,j],0))
+    y.range1<-range(c( pred[select.indices,i,j]/denom[select.indices,i,j],obs[select.indices,i,j]/denom[select.indices,i,j], upi[select.indices,i,j]/denom[select.indices,i,j],0))
   plot(dates,
-       pred[select.indices,i,j],
+       pred[select.indices,i,j]/denom[select.indices,i,j],
        type='l',
        col='red',
        ylim=y.range1,
        bty='l',
-       ylab='N cases',
+       ylab='Proportion',
        main=paste(states[i],ages[j]))
 
   points(dates,
-         obs[select.indices,i,j],
+         obs[select.indices,i,j]/denom[select.indices,i,j],
          type='l',
          col='black')
 
   polygon(c(dates,
             rev(dates)),
-          c(lpi[select.indices,i,j],
-            rev(upi[select.indices,i,j])),
+          c(lpi[select.indices,i,j]/denom[select.indices,i,j],
+            rev(upi[select.indices,i,j]/denom[select.indices,i,j])),
           col = rgb(1, 0, 0, alpha = 0.1),
           border = NA)
   }
