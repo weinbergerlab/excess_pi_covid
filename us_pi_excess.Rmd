@@ -13,8 +13,8 @@ library(RColorBrewer)
 library(plotly)
 ```
 
-## Install package
 ```{r}
+## Install package
 if (!require("devtools")) {
   install.packages("devtools")
 }
@@ -26,15 +26,17 @@ library(ExcessILI)
 library(cdcfluview)
 ```
 
-## Download the mortality data
 
 ```{r}
+## Download the mortality data
+
 pi.data <- pi_mortality(coverage_area='state')
 
 ```
 
-Format and fill mssings with 0s
 ```{r}
+#Format and fill mssings with 0s
+
 pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
 pi.data$state[pi.data$region_name == 'New York City'] <- 'NYC'
 spl1<-split(pi.data, pi.data$state)
@@ -46,6 +48,7 @@ pi.data.clean <- pi.data.clean[!is.na(pi.data.clean$miss.x),]
 ```
 
 ```{r}
+#Run analysis
 excess_deaths1.adjusted <-
   excessCases(ds = pi.data.clean,
               datevar       = "wk_start",
@@ -63,11 +66,12 @@ excess_deaths1.adjusted <-
 ```
 
 
-## Generate static versions of the plots
+## Plot observed weekly death rate vs baseline
 
-### Extract the quantities of interest
 
 ```{r}
+### Extract the quantities of interest
+
 #Which syndrome do you want to plot, and over what time range?
 
 syndrome.select <- 'total_pni' #which syndrome do you want to plot?
@@ -162,6 +166,7 @@ for(i in 1:dim(pred)[2]){
   }
 }
 ```
+## Observed/expected
 ```{r}
 n.cols=100
 set.seed(123)
