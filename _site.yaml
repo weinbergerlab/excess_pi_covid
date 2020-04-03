@@ -1,0 +1,22 @@
+name: Excess P&I mortality
+navbar:
+  title: Excess P&I mortality
+  left:
+  - text: Topics
+    menu:
+    - text: US PI example
+      href: us_pi_excess.html
+  right:
+output:
+  html_document:
+    theme: spacelab
+    highlight: haddock
+    css: html-md-01.css
+    fig_caption: no
+    number_sections: yes
+    toc: yes
+    toc_float: no
+    collapsed: no
+    lib_dir: site_libs
+    self_contained: no
+output_dir: docs

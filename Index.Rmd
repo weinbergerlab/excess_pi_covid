@@ -1,0 +1,7 @@
+---
+title: "Index"
+author: "Dan Weinberger"
+date: "4/2/2020"
+output: html_document
+---
+ Estimating Excess mortality due to pneumonia and influenza associated with COVID-19. Mortality data obtained from  CDC fluview, through the cdcfluview package in R
