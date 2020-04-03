@@ -5,8 +5,12 @@ date: "4/2/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, echo=F}
 knitr::opts_chunk$set(echo = TRUE)
+library(reshape2)
+library(ggplot2)
+library(RColorBrewer)
+library(plotly)
 ```
 
 ## Install package
@@ -29,32 +33,33 @@ pi.data <- pi_mortality(coverage_area='state')
 
 ```
 
-Format and subset
+Format and fill mssings with 0s
 ```{r}
 pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
 pi.data$state[pi.data$region_name == 'New York City'] <- 'NYC'
-
-#pi.data.subset <- pi.data[pi.data$state %in% c('AL','AZ','CA','CO','FL','GA','IL','IN','LA','MD','MA','MI','MN','MO','NV','NJ','NY','NC','OH','PA','SC','TN','TX','VA','WA','WI'),]
-
-pi.data.subset <- as.data.frame(pi.data[pi.data$state %in% c('AZ','CA','FL','GA','IL','LA','MI','MN','NJ','NY','OH','PA','TX','VA','WA','WI'),])
-pi.data.subset <-pi.data.subset[order(pi.data.subset$state, pi.data.subset$wk_start),]
+spl1<-split(pi.data, pi.data$state)
+min.state <- lapply(spl1, function(x){ x$miss.x<-min(x$total_pni)
+return(x)
+                })
+pi.data.clean <- do.call('rbind.data.frame',min.state)
+pi.data.clean <- pi.data.clean[!is.na(pi.data.clean$miss.x),]
 ```
 
 ```{r}
 excess_deaths1.adjusted <-
-  excessCases(ds = pi.data.subset,
+  excessCases(ds = pi.data.clean,
               datevar       = "wk_start",
               statevar      = "state",
               denom.var     = "all_deaths",
-              adj.flu       = "auto",
+              adj.flu       = "none",
               use.syndromes = c("total_pni"),
               extrapolation.date = "2020-03-01",
               time.res='week')
 ```
 
 
-```{r, echo=T}
- dashboardPlot(excess_deaths1.adjusted)
+```{r, echo=F}
+ #dashboardPlot(excess_deaths1.adjusted)
 ```
 
 
@@ -110,15 +115,41 @@ pred<-  excessExtract(ds = ds,
                 syndrome = syndrome.select,
                 extract.quantity = "pred")
 
+rr <-  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "resid1")
 ```
 
 Generate the plots
-```{r, fig.width=8, fig.height=7}
 
+```{r}
+n.days <- 52
 select.indices <- (length(dates1)-n.days):length(dates1)
 dates<-dates1[select.indices]
 states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
+```
+
+```{r}
+n.cols=100
+set.seed(123)
+rr2 <- as.data.frame(rr[select.indices,,1])
+rr2$date <-dates
+nice.cols <-  colorRampPalette(brewer.pal(11, "Set3"))(ncol(rr2))
+nice.cols<-sample(nice.cols)
+
+meltdf <- melt(rr2, id.vars = 'date')
+p1<-ggplot(meltdf,aes(x=date,y=exp(value),
+                      color=variable,
+                      group=variable)) +
+ geom_line() +  
+  theme_bw() + 
+   labs(y="Observed/Expected")+
+  theme(panel.border = element_blank()) + scale_color_manual(values = nice.cols)
+ggplotly(p1)
+```
+
+```{r, fig.width=8, fig.height=7}
 
   par(mfrow=c(4,4))
 
