@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE, echo=F}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 library(reshape2)
 library(ggplot2)
 library(RColorBrewer)
@@ -67,15 +67,16 @@ excess_deaths1.adjusted <-
 
 ### Extract the quantities of interest
 
-Which syndrome do you want to plot, and over what time range?
 ```{r}
+#Which syndrome do you want to plot, and over what time range?
+
 syndrome.select <- 'total_pni' #which syndrome do you want to plot?
 n.days<-52  #How many days to plot?
 ds <- excess_deaths1.adjusted
 ```
  
-Extract the data needed to plot from the results
 ```{r}
+#Extract the data needed to plot from the results
 
 dates1 <-
   ds[[1]][[1]][[1]]$date
@@ -130,24 +131,6 @@ states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
 ```
 
-```{r}
-n.cols=100
-set.seed(123)
-rr2 <- as.data.frame(rr[select.indices,,1])
-rr2$date <-dates
-nice.cols <-  colorRampPalette(brewer.pal(11, "Set3"))(ncol(rr2))
-nice.cols<-sample(nice.cols)
-
-meltdf <- melt(rr2, id.vars = 'date')
-p1<-ggplot(meltdf,aes(x=date,y=exp(value),
-                      color=variable,
-                      group=variable)) +
- geom_line() +  
-  theme_bw() + 
-   labs(y="Observed/Expected")+
-  theme(panel.border = element_blank()) + scale_color_manual(values = nice.cols)
-ggplotly(p1)
-```
 
 ```{r, fig.width=8, fig.height=7}
 
@@ -178,4 +161,25 @@ for(i in 1:dim(pred)[2]){
           border = NA)
   }
 }
+```
+```{r}
+n.cols=100
+set.seed(123)
+rr2 <- as.data.frame(rr[select.indices,,1])
+rr2$date <-dates
+nice.cols <-  colorRampPalette(brewer.pal(11, "Set3"))(ncol(rr2))
+nice.cols<-sample(nice.cols)
+
+meltdf <- melt(rr2, id.vars = 'date')
+meltdf$rr<-exp(meltdf$value)
+p1<-ggplot(meltdf,aes(x=date,y=rr,
+                      color=variable,
+                      group=variable)) +
+ geom_line() +  
+  theme_bw() + 
+  ggtitle("Excess P&I mortality") +
+   labs(y="Observed/Expected")+
+  theme(panel.border = element_blank()) + scale_color_manual(values = nice.cols)+
+  scale_x_date(date_labels = "%b-%Y")
+ggplotly(p1)
 ```
