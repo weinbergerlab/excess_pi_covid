@@ -31,7 +31,8 @@ library(RColorBrewer)
 library(plotly)
 library(MMWRweek)
 library(readr)
-
+library(httr)
+library(jsonlite)
 ```
 
 ## Introduction
