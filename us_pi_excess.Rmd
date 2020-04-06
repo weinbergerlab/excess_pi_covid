@@ -5,6 +5,10 @@ date: "4/3/2020"
 output:
   html_document:
     df_print: paged
+    html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
 ---
 
 ```{r, include = F}
@@ -249,7 +253,7 @@ excess_deaths <- excessExtract(ds = ds,
                 extract.quantity = "unexplained.cases")
 ```
 
-## Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
+## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
  
 ```{r}
 n.days <- 52
@@ -292,7 +296,7 @@ for(i in 1:dim(pred)[2]){
 }
 ```
 
-## Observed deaths/expected deaths by state
+## Figure 2: Observed deaths/expected deaths by state
 
 ```{r, echo=F}
 rr2<-rr[,,1]
@@ -342,8 +346,8 @@ cumsum_excess_deaths_state <- apply(excess_deaths2,2,cumsum)
 
 ```
 
-## Reported number of COVID-19 deaths,as compiled by the the New York Times compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week, and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
+## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
+The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week (as compiled by the New York Times), and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
 
 ```{r, echo=F}
 urlfile="https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv"
@@ -412,7 +416,7 @@ for(i in 1:length(states.cdc)){
 
 ```
 
-## Compare Excess P&I mortality vs Excess ILI
+## Figure 4: Compare Excess P&I mortality vs Excess ILI
 
 Here we compare the observed vs expected number of deaths due to pneumonia and influenza in each week compare to the observed vs expected number of outpatient visits for influenza-like illness (ILI) in each week. we would expect ILI (blue line) to increase earlier than deaths (red line)
 ```{r, include=F}
@@ -484,7 +488,7 @@ for(i in 1:length(common.states)){
 
 ```
 
-## Excess all-cause deaths
+## Supplementary figure: Excess all-cause deaths
 
 Now instead of modeling the proportion of deaths that were due to pneumonia and influenza, we will model all-caused deaths
 ```{r}
@@ -553,9 +557,11 @@ rr.ac <-  excessExtract(ds = excess_deaths1.ac,
 
 ```
 
-Just compare excess all-cause deaths with excess P&I deaths
 ```{r}
-plot(excess_deaths.ac, excess_deaths)
+# compare excess all-cause deaths with excess P&I deaths
+
+dates.select <- which(dates1 >= as.Date('2020-01-01'))
+#plot( excess_deaths[dates.select,,1],excess_deaths.ac[dates.select,,1])
 
 ```
 
