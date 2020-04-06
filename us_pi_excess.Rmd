@@ -343,7 +343,7 @@ cumsum_excess_deaths_state <- apply(excess_deaths2,2,cumsum)
 ```
 
 ## Reported number of COVID-19 deaths,as compiled by the the New York Times compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week, and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available.
+The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week, and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
 
 ```{r, echo=F}
 urlfile="https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv"
@@ -374,7 +374,7 @@ nyt.c2 <- merge(nyt.c, excess_deaths.m, by=c('state','date') , all=T)
 nyt.c2 <-nyt.c2[nyt.c2$state %in% states.cdc,]
 nyt.c2$new.deaths[is.na(nyt.c2$new.deaths)] <- 0
 
-#nyt.c2 <- merge(nyt.c2 , pi.data[c('state', 'wk_start','percent_complete')], by.x=c('state','date') , by.y=c('state','wk_start'))
+nyt.c2 <- merge(nyt.c2 , pi.data[c('state', 'wk_start','percent_complete')], by.x=c('state','date') , by.y=c('state','wk_start'), all=T)
 
 
 nyt.c2 <- nyt.c2[nyt.c2$date >= as.Date('2020-01-01'),]
@@ -388,7 +388,7 @@ par(mfrow=c(4,4))
 
 for(i in 1:length(states.cdc)){
     ds.select <- nyt.c2[nyt.c2$state==states.cdc[i],]
-    y.range1<-range(c(ds.select$new.deaths, ds.select$excess_pi), na.rm=T)
+    y.range1<-range(c(ds.select$new.deaths, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
     ds.select$new.deaths.early <- ds.select$new.deaths
     ds.select$new.deaths.early[is.na(ds.select$excess_pi)] <- NA
     plot(ds.select$date         ,
@@ -406,7 +406,7 @@ for(i in 1:length(states.cdc)){
        lty=1, lwd=2)
     
        points(ds.select$date         ,
-       ds.select$excess_pi, type='l', col='blue', lwd=2)
+       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
     abline(h=1, col='black')
 }
 
