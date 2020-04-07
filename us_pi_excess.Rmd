@@ -31,8 +31,7 @@ library(RColorBrewer)
 library(plotly)
 library(MMWRweek)
 library(readr)
-library(httr)
-library(jsonlite)
+library(rjson)
 ```
 
 ## Introduction
@@ -51,6 +50,50 @@ In this study, we compare the reported number of P&I cases across the United Sta
 
 pi.data <- pi_mortality(coverage_area='state')
 
+```
+
+
+```{r}
+
+url.test<-"https://covidtracking.com/api/v1/states/daily.json" 
+
+
+json_data <- fromJSON(file=url.test)
+test.dates <- as.character(sapply(json_data,'[[','date'))
+
+test.state <- sapply(json_data,'[[','state')
+testN <- sapply(json_data, '[[', 'totalTestResults')
+test.ds <- cbind.data.frame('state'=test.state,test.dates, 'cum.tests'=testN )
+test.ds$test.dates <-as.Date(test.ds$test.dates, '%Y%m%d')
+test.ds$dow <- weekdays(test.ds$test.dates)
+
+#Look at number of test at end of week..match this to the start date
+test.ds <- test.ds[test.ds$dow == 'Saturday' ,]
+test.ds$test.dates <- test.ds$test.dates - 6
+
+pop1<-read.csv('./Data/nst-est2019-01.csv')
+pop1$state_name <- substring(pop1$state_name,2)
+pop1$state <- state.abb[match(pop1$state_name, state.name)]
+pop1$census_bureau_pop_2019 <- gsub( ',', '',pop1$census_bureau_pop_2019)
+pop1$census_bureau_pop_2019 <-as.numeric(pop1$census_bureau_pop_2019)
+
+test.ds2 <- merge(test.ds, pop1, by='state')
+test.ds2$cum.test.per.capita <- test.ds2$cum.tests/test.ds2$census_bureau_pop_2019*1000
+test.ds2 <- test.ds2[, c('state','cum.test.per.capita', 'test.dates')]
+
+test.ds2.spl <- split( test.ds2, test.ds2$state)
+test.ds2.spl <- lapply(test.ds2.spl, function(x){
+  if(nrow(x)>0){
+  x<-x[order(x$test.dates),]
+  x$test.week.per.capita <- x$cum.test.per.capita
+  for(i in 2: nrow(x)){
+    x$test.week.per.capita[i] <- x$cum.test.per.capita[i] - x$cum.test.per.capita[i-1]
+  }
+  }
+  return(x)
+}
+  )
+test.ds3.spl <-do.call('rbind.data.frame', test.ds2.spl)
 ```
 
 ```{r}
@@ -383,24 +426,28 @@ nyt.c2 <- merge(nyt.c2 , pi.data[c('state', 'wk_start','percent_complete')], by.
 
 
 nyt.c2 <- nyt.c2[nyt.c2$date >= as.Date('2020-01-01'),]
+nyt.c2$new.cases[is.na(nyt.c2$new.cases)] <- 0
 
+nyt.c2 <- merge(nyt.c2, test.ds3.spl, by.x=c('state','date'), by.y=c('state','test.dates'), all=T)
 
+nyt.c2 <- nyt.c2[ !is.na(nyt.c2$new.cases), ]
 ```
 
 ```{r, fig.width=8, fig.height=7}
 
 par(mfrow=c(4,4))
-
+y2.range.test <- range(nyt.c2$test.week.per.capita, na.rm=T)
 for(i in 1:length(states.cdc)){
     ds.select <- nyt.c2[nyt.c2$state==states.cdc[i],]
     y.range1<-range(c(ds.select$new.deaths, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
     ds.select$new.deaths.early <- ds.select$new.deaths
     ds.select$new.deaths.early[is.na(ds.select$excess_pi)] <- NA
+    par(new=FALSE)
     plot(ds.select$date         ,
        ds.select$new.deaths,
        type='l',
        col='red',
-       ylim=y.range1,
+       ylim=c(0,max(y.range1)),
        bty='l',
        lty=3,
        ylab='N Deaths',
@@ -413,6 +460,12 @@ for(i in 1:length(states.cdc)){
        points(ds.select$date         ,
        ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
     abline(h=1, col='black')
+    
+    par(new=TRUE)
+   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
+   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
+ mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
+    
 }
 
 ```
