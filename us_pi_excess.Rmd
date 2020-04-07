@@ -54,7 +54,7 @@ pi.data <- pi_mortality(coverage_area='state')
 
 
 ```{r}
-
+#TESTING DATA FORMATTING
 url.test<-"https://covidtracking.com/api/v1/states/daily.json" 
 
 
@@ -63,7 +63,15 @@ test.dates <- as.character(sapply(json_data,'[[','date'))
 
 test.state <- sapply(json_data,'[[','state')
 testN <- sapply(json_data, '[[', 'totalTestResults')
-test.ds <- cbind.data.frame('state'=test.state,test.dates, 'cum.tests'=testN )
+cum.death <- sapply(json_data, '[[', 'death')
+cum.death <-sapply(cum.death, function(x){ 
+  if(is.null(x)){
+  x <-0
+  }
+  return(x)
+  }
+  )
+test.ds <- cbind.data.frame('state'=test.state,test.dates, 'cum.tests'=testN, 'cov.track.cum.death'=cum.death )
 test.ds$test.dates <-as.Date(test.ds$test.dates, '%Y%m%d')
 test.ds$dow <- weekdays(test.ds$test.dates)
 
@@ -79,15 +87,19 @@ pop1$census_bureau_pop_2019 <-as.numeric(pop1$census_bureau_pop_2019)
 
 test.ds2 <- merge(test.ds, pop1, by='state')
 test.ds2$cum.test.per.capita <- test.ds2$cum.tests/test.ds2$census_bureau_pop_2019*1000
-test.ds2 <- test.ds2[, c('state','cum.test.per.capita', 'test.dates')]
+test.ds2 <- test.ds2[, c('state','cum.test.per.capita', 'test.dates','cov.track.cum.death')]
 
 test.ds2.spl <- split( test.ds2, test.ds2$state)
 test.ds2.spl <- lapply(test.ds2.spl, function(x){
   if(nrow(x)>0){
   x<-x[order(x$test.dates),]
   x$test.week.per.capita <- x$cum.test.per.capita
+  x$covid.track.death    <- x$cov.track.cum.death
+  
   for(i in 2: nrow(x)){
     x$test.week.per.capita[i] <- x$cum.test.per.capita[i] - x$cum.test.per.capita[i-1]
+    
+    x$covid.track.death[i] <- x$cov.track.cum.death[i] - x$cov.track.cum.death[i-1]
   }
   }
   return(x)
@@ -397,6 +409,9 @@ The blue line shows the number of excess P&I cases, the red solid line shows the
 urlfile="https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv"
 nyt<-as.data.frame(read_csv(url(urlfile)))
     nyt$state <- state.abb[match(nyt$state, state.name)]
+    
+    #Calculate new cases/day/state from cumulative variable,
+    #then sum new cased by week and state
 nyt.spl<-split(nyt, nyt$state)
 nyt.spl2 <- lapply(nyt.spl, function(x){
   x$new.cases<- x$cases
@@ -469,6 +484,207 @@ for(i in 1:length(states.cdc)){
 }
 
 ```
+
+## Alternate Fig 3: Instead use the JHSPH mortality data
+
+```{r}
+jh1.url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv"
+jh1<-as.data.frame(read_csv(url(jh1.url)))
+jh1 <- jh1[jh1$iso2=='US',]
+jh1.m <- melt(jh1[, c(6:7,13:ncol(jh1))], id.vars=c('Admin2',"Province_State"))
+jh1.m$variable <-as.Date(jh1.m$variable, '%m/%d/%y')
+
+#Aggregate across the admin2 regions by day
+jh2 <- aggregate( jh1.m$value, by=list('date'=jh1.m$variable, 'state'=jh1.m$Province_State), FUN=sum, na.rm=T)
+names(jh2) <- c('date','state', 'cum.deaths')
+
+jh2.spl <- split(jh2, jh2$state)
+jh2.spl <-lapply(jh2.spl, function(x){
+  x$deaths<-x$cum.deaths
+  for(i in 2:nrow(x)){
+    x$deaths[i] <- x$cum.deaths[i] - x$cum.deaths[(i-1)]
+  }
+  return(x)
+})
+jh2 <- do.call('rbind.data.frame', jh2.spl)
+jh2$state <- state.abb[match(jh2$state, state.name)]
+
+#round date to sunday
+jh2$date <-floor_date(jh2$date, 'week')
+
+jh2.agg<- aggregate( jh2$deaths, by=list('state'=jh2$state, 'date'=jh2$date), FUN=sum)
+names(jh2.agg) <- c('state', 'date', 'deaths')
+
+excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
+excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
+names(excess_deaths.m) <-c('date','state','excess_pi')
+states.cdc <- unique(excess_deaths.m$state)
+jh3 <- merge(jh2.agg, excess_deaths.m, by=c('state','date') , all=T)
+jh3 <-jh3[jh3$state %in% states.cdc,]
+
+jh3 <- merge( jh3, pi.data[c('state', 'wk_start','percent_complete')], by.x=c('state','date') , by.y=c('state','wk_start'), all=T)
+
+jh3 <- jh3[jh3$date >= as.Date('2020-01-01'),]
+jh3$deaths[is.na(jh3$deaths)] <- 0
+
+jh3 <- merge(jh3, test.ds3.spl, by.x=c('state','date'), by.y=c('state','test.dates'), all=T)
+jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
+
+jh3 <- jh3[ !is.na(jh3$deaths), ]
+
+
+```
+
+```{r, fig.width=8, fig.height=7}
+
+par(mfrow=c(4,4))
+y2.range.test <- range(jh3$test.week.per.capita, na.rm=T)
+for(i in 1:length(states.cdc)){
+    ds.select <- jh3[jh3$state==states.cdc[i],]
+    y.range1<-range(c(ds.select$deaths, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
+    ds.select$death.early <- ds.select$deaths
+    ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
+    par(new=FALSE)
+    plot(ds.select$date         ,
+       ds.select$deaths,
+       type='l',
+       col='red',
+       ylim=c(0,max(y.range1)),
+       bty='l',
+       lty=3,
+       ylab='N Deaths',
+       main=paste(states.cdc[i] ))
+    
+       points(ds.select$date         ,
+       ds.select$death.early, type='l', col='red',
+       lty=1, lwd=2)
+    
+       points(ds.select$date         ,
+       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
+    abline(h=1, col='black')
+    
+    par(new=TRUE)
+   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
+   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
+ mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
+    
+}
+
+```
+## Alternate Fig 3: covidtracking.com data
+```{r, fig.width=8, fig.height=7}
+
+par(mfrow=c(4,4))
+y2.range.test <- range(jh3$test.week.per.capita, na.rm=T)
+for(i in 1:length(states.cdc)){
+    ds.select <- jh3[jh3$state==states.cdc[i],]
+    y.range1<-range(c(ds.select$covid.track.death, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
+    ds.select$death.early <- ds.select$covid.track.death
+    ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
+    par(new=FALSE)
+    plot(ds.select$date         ,
+       ds.select$covid.track.death,
+       type='l',
+       col='red',
+       ylim=c(0,max(y.range1)),
+       bty='l',
+       lty=3,
+       ylab='N Deaths',
+       main=paste(states.cdc[i] ))
+    
+       points(ds.select$date         ,
+       ds.select$death.early, type='l', col='red',
+       lty=1, lwd=2)
+    
+       points(ds.select$date         ,
+       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
+    #abline(h=1, col='black')
+    
+    par(new=TRUE)
+   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
+   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
+ mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
+    
+}
+
+```
+
+```{r}
+## And finally,  use the NCHS COVID death data
+#(Not yet available with state-level resolution)
+#cdc.covid.url<- "https://data.cdc.gov/resource/hc4f-j6nb.json"
+```
+
+## Supp Figure: Extract official data directly from FL 
+This shows that the Johns Hopkins data and NYTimes data are off by ~ 1 week in the date assignments. The Florida data records the 'date case counted', so it is possible this date is not date of death either--If this date is when the case was recognized rather than when they died, for instance.
+
+```{r}
+library(pdftools)
+library(readr)
+library(gsubfn)
+fl_text <-pdf_text("./Data/covid-19-data---daily-report-2020-04-06-1657.pdf")
+fl1<-read_lines(fl_text)
+death.start <- grep('Death    County         Age Gender', fl1 )
+death.start.gap <-death.start +3
+
+fl2 <-fl1[death.start.gap[1] : (death.start.gap[1]+300)]
+fl.dates <- strapplyc(fl2, "[0-9/]{8,}", simplify = TRUE)
+fl.dates <- unlist(fl.dates)
+fl.dates <- as.Date(fl.dates, '%m/%d/%y')
+fl3 <-cbind.data.frame('date'=fl.dates,'deaths'=rep(1, length(fl.dates)))
+fl3$wkdate <- floor_date(fl3$date, 'week')
+fl4 <- aggregate(fl3[,'deaths'], by=list('date'=fl3$wkdate), FUN=sum )
+names(fl4) <- c('date', 'official_deaths')
+
+fl5 <- merge(jh3, fl4, by='date', all=T)
+fl5 <-fl5[fl5$state=='FL',]
+fl5 <-fl5[!is.na(fl5$state),]
+
+par(mfrow=c(1,1))
+states.cdc <-'FL'
+y2.range.test <- range(fl5$test.week.per.capita, na.rm=T)
+for(i in 1:length(states.cdc)){
+    ds.select <- fl5[fl5$state==states.cdc[i],]
+    y.range1<-range(c(ds.select$covid.track.death, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
+    ds.select$death.early <- ds.select$covid.track.death
+    ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
+    par(new=FALSE)
+    plot(ds.select$date         ,
+       ds.select$covid.track.death,
+       type='l',
+       col='red',
+       ylim=c(0,max(y.range1)),
+       bty='l',
+       lty=3,
+       ylab='N Deaths',
+       xlab='Date',
+       main=paste(states.cdc[i] ))
+    
+       points(ds.select$date         ,
+       ds.select$death.early, type='l', col='red',
+       lty=1, lwd=2)
+       
+      points(ds.select$date         ,
+       ds.select$deaths, type='l', col='purple',#JH data
+       lty=1, lwd=2)
+       
+      points(ds.select$date         ,
+       ds.select$official_deaths, type='l', col='orange',
+       lty=1, lwd=2)
+
+       points(ds.select$date         ,
+       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
+    abline(h=1, col='black')
+    
+    par(new=TRUE)
+   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='', bty='l')
+   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
+ mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
+    
+}
+
+```
+
 
 ## Figure 4: Compare Excess P&I mortality vs Excess ILI
 
