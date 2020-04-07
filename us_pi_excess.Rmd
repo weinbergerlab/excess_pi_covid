@@ -32,6 +32,9 @@ library(plotly)
 library(MMWRweek)
 library(readr)
 library(rjson)
+library(htmlTable)
+library(RSocrata)
+source('./functions/ts_plot_func.R')
 ```
 
 ## Introduction
@@ -47,11 +50,15 @@ In this study, we compare the reported number of P&I cases across the United Sta
 
 ```{r}
 ## Download the mortality data
-
+#pi.data.alt <- read.socrata("https://data.cdc.gov/resource/pp7x-dyj2.json")
+#pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
 pi.data <- pi_mortality(coverage_area='state')
-
+pi.data$percent_complete[pi.data$percent_complete > 1] <- 1
 ```
 
+```{r}
+plot.states <- c('CA', 'FL','GA','ID','IL', 'LA','MA','MI','MO', 'MT', 'NJ', 'NY', 'OR', 'PA', 'WA' )
+```
 
 ```{r}
 #TESTING DATA FORMATTING
@@ -227,6 +234,8 @@ matplot(cor.lags['percent_pni',-1,], type='l')
 #Is lag of 0,1,or 2 the best?...shows 1 weeks lag best in 20 states,  2 week lag best in 3 states
 table(apply(cor.lags['percent_pni',-1,],2, function(x) which(max(x)==x)))
 
+states.cdc <- unique(pi.data.clean2$state)
+
 ```
 
 ```{r, include=F}
@@ -321,21 +330,28 @@ ages <- dimnames(pred)[[3]]
 
 The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+7`.
 
-```{r, fig.width=8, fig.height=7}
+```{r, fig.width=6, fig.height=8}
 
-  par(mfrow=c(4,4))
+  par(mfrow=c(5,3), mar=c(2,4,2,1))
 
-for(i in 1:dim(pred)[2]){
+plot.state.indices <- which(dimnames(pred)[[2]] %in% plot.states )
+for(i in plot.state.indices){
   for(j in 1:dim(pred)[3]){
     y.range1<-range(c( pred[select.indices,i,j]/denom[select.indices,i,j],obs[select.indices,i,j]/denom[select.indices,i,j], upi[select.indices,i,j]/denom[select.indices,i,j],0))
+      state.name.plot <-  state.name[match(states[i],state.abb)]
+
   plot(dates,
        pred[select.indices,i,j]/denom[select.indices,i,j],
        type='l',
        col='red',
        ylim=y.range1,
        bty='l',
+       xlab='',
        ylab='Proportion',
-       main=paste(states[i],ages[j]))
+       #main=paste(states[i])
+       )
+  
+  text(x=as.Date('2019-03-01'),y=0.005, state.name.plot, pos=4)
 
   points(dates,
          obs[select.indices,i,j]/denom[select.indices,i,j],
@@ -368,11 +384,12 @@ check<-cbind.data.frame(date.mmwrdates,mmwr.epiwk, mmwr.epiyr)
 
 These plots show the Observed/Expected number of deaths due to pneumonia and influenza in each week for the 2019-20 year (red) compared to previous years (gray). Values close to 1 indicate that the values for that week are close to what would be expected based on the time of year and influenza activity.
 
-```{r, fig.width=8, fig.height=7}
+```{r, fig.width=6, fig.height=8}
 
-  par(mfrow=c(4,4))
+  par(mfrow=c(5,3), mar=c(2,4,2,1))
+plot.state.indices <- which(dimnames(pred)[[2]] %in% plot.states )
 
-for(i in 1:dim(pred)[2]){
+for(i in plot.state.indices){
     y.range1<-c(0,2)
     ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2[,i])
     ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
@@ -403,89 +420,7 @@ cumsum_excess_deaths_state <- apply(excess_deaths2,2,cumsum)
 ```
 
 ## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week (as compiled by the New York Times), and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
-
-```{r, echo=F}
-urlfile="https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv"
-nyt<-as.data.frame(read_csv(url(urlfile)))
-    nyt$state <- state.abb[match(nyt$state, state.name)]
-    
-    #Calculate new cases/day/state from cumulative variable,
-    #then sum new cased by week and state
-nyt.spl<-split(nyt, nyt$state)
-nyt.spl2 <- lapply(nyt.spl, function(x){
-  x$new.cases<- x$cases
-  x$new.deaths<- x$deaths
-    for(i in 2: nrow(x)){
-    x$new.deaths[i]<- x$deaths[i] - x$deaths[i-1]
-    x$new.cases[i]<- x$cases[i] - x$cases[i-1]
-    }
-  return(x)
-}  )   
-nyt2 <- do.call('rbind.data.frame', nyt.spl2)
-    
-  nyt2$date <- floor_date(nyt2$date, 'week')
-  nyt.m <- melt( nyt2[,c('date','state','cases','deaths','new.cases','new.deaths')], id.vars = c('state', 'date'))
-nyt.c <- dcast( nyt.m, date + state ~variable, fun.aggregate = sum)
-names(nyt.c)[1:2] <- c('date', 'state')
-
-excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
-excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
-names(excess_deaths.m) <-c('date','state','excess_pi')
-states.cdc <- unique(excess_deaths.m$state)
-nyt.c2 <- merge(nyt.c, excess_deaths.m, by=c('state','date') , all=T)
-nyt.c2 <-nyt.c2[nyt.c2$state %in% states.cdc,]
-nyt.c2$new.deaths[is.na(nyt.c2$new.deaths)] <- 0
-
-nyt.c2 <- merge(nyt.c2 , pi.data[c('state', 'wk_start','percent_complete')], by.x=c('state','date') , by.y=c('state','wk_start'), all=T)
-
-
-nyt.c2 <- nyt.c2[nyt.c2$date >= as.Date('2020-01-01'),]
-nyt.c2$new.cases[is.na(nyt.c2$new.cases)] <- 0
-
-nyt.c2 <- merge(nyt.c2, test.ds3.spl, by.x=c('state','date'), by.y=c('state','test.dates'), all=T)
-
-nyt.c2 <- nyt.c2[ !is.na(nyt.c2$new.cases), ]
-```
-
-```{r, fig.width=8, fig.height=7}
-
-par(mfrow=c(4,4))
-y2.range.test <- range(nyt.c2$test.week.per.capita, na.rm=T)
-for(i in 1:length(states.cdc)){
-    ds.select <- nyt.c2[nyt.c2$state==states.cdc[i],]
-    y.range1<-range(c(ds.select$new.deaths, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
-    ds.select$new.deaths.early <- ds.select$new.deaths
-    ds.select$new.deaths.early[is.na(ds.select$excess_pi)] <- NA
-    par(new=FALSE)
-    plot(ds.select$date         ,
-       ds.select$new.deaths,
-       type='l',
-       col='red',
-       ylim=c(0,max(y.range1)),
-       bty='l',
-       lty=3,
-       ylab='N Deaths',
-       main=paste(states.cdc[i] ))
-    
-       points(ds.select$date         ,
-       ds.select$new.deaths.early, type='l', col='red',
-       lty=1, lwd=2)
-    
-       points(ds.select$date         ,
-       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
-    abline(h=1, col='black')
-    
-    par(new=TRUE)
-   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
-   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
- mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
-    
-}
-
-```
-
-## Alternate Fig 3: Instead use the JHSPH mortality data
+The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week (as compiled by the Johns Hopkins CSEE), and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
 
 ```{r}
 jh1.url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv"
@@ -518,8 +453,20 @@ names(jh2.agg) <- c('state', 'date', 'deaths')
 excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
 excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
 names(excess_deaths.m) <-c('date','state','excess_pi')
-states.cdc <- unique(excess_deaths.m$state)
+
+excess_deaths.upi.df <- cbind.data.frame('date'=dates1,  (obs[,,1]-lpi[,,1] ))
+excess_deaths.upi.m <- melt(excess_deaths.upi.df, id.vars =c('date'))
+names(excess_deaths.upi.m) <-c('date','state','excess_deaths.upi')
+
+excess_deaths.lpi.df <- cbind.data.frame('date'=dates1,(obs[,,1]-upi[,,1]) )
+excess_deaths.lpi.m <- melt(excess_deaths.lpi.df, id.vars =c('date'))
+names(excess_deaths.lpi.m) <-c('date','state','excess_deaths.lpi')
+
+#states.cdc <- unique(excess_deaths.m$state)
 jh3 <- merge(jh2.agg, excess_deaths.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, excess_deaths.lpi.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, excess_deaths.upi.m, by=c('state','date') , all=T)
+
 jh3 <-jh3[jh3$state %in% states.cdc,]
 
 jh3 <- merge( jh3, pi.data[c('state', 'wk_start','percent_complete')], by.x=c('state','date') , by.y=c('state','wk_start'), all=T)
@@ -532,82 +479,34 @@ jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
 
 jh3 <- jh3[ !is.na(jh3$deaths), ]
 
+#Only plot out to 1 week ahead of the US P&I data
+jh3 <- jh3[ jh3$date <= max(pi.data$wk_start +7),]
 
 ```
 
-```{r, fig.width=8, fig.height=7}
+```{r, fig.width=6, fig.height=6}
+par(mfrow=c(5,3), mar=c(2,3,1,2))
+#could use 'states.cdc' or plot.states
+ts.plot.func(ds.plot=jh3, death.var='deaths' ,states.plot=plot.states )
 
-par(mfrow=c(4,4))
-y2.range.test <- range(jh3$test.week.per.capita, na.rm=T)
-for(i in 1:length(states.cdc)){
-    ds.select <- jh3[jh3$state==states.cdc[i],]
-    y.range1<-range(c(ds.select$deaths, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
-    ds.select$death.early <- ds.select$deaths
-    ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
-    par(new=FALSE)
-    plot(ds.select$date         ,
-       ds.select$deaths,
-       type='l',
-       col='red',
-       ylim=c(0,max(y.range1)),
-       bty='l',
-       lty=3,
-       ylab='N Deaths',
-       main=paste(states.cdc[i] ))
-    
-       points(ds.select$date         ,
-       ds.select$death.early, type='l', col='red',
-       lty=1, lwd=2)
-    
-       points(ds.select$date         ,
-       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
-    abline(h=1, col='black')
-    
-    par(new=TRUE)
-   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
-   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
- mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
-    
-}
 
 ```
 ## Alternate Fig 3: covidtracking.com data
 ```{r, fig.width=8, fig.height=7}
 
 par(mfrow=c(4,4))
-y2.range.test <- range(jh3$test.week.per.capita, na.rm=T)
-for(i in 1:length(states.cdc)){
-    ds.select <- jh3[jh3$state==states.cdc[i],]
-    y.range1<-range(c(ds.select$covid.track.death, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
-    ds.select$death.early <- ds.select$covid.track.death
-    ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
-    par(new=FALSE)
-    plot(ds.select$date         ,
-       ds.select$covid.track.death,
-       type='l',
-       col='red',
-       ylim=c(0,max(y.range1)),
-       bty='l',
-       lty=3,
-       ylab='N Deaths',
-       main=paste(states.cdc[i] ))
-    
-       points(ds.select$date         ,
-       ds.select$death.early, type='l', col='red',
-       lty=1, lwd=2)
-    
-       points(ds.select$date         ,
-       ds.select$excess_pi/ds.select$percent_complete, type='l', col='blue', lwd=2)
-    #abline(h=1, col='black')
-    
-    par(new=TRUE)
-   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
-   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
- mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
-    
-}
+ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=states.cdc )
+
 
 ```
+Count number of excess cases since Jan 1 to most recent weke when P&I data available
+```{r}
+count.excess <-jh3[jh3$date >= as.Date('2020-01-01') & jh3$date <=max(pi.data$wk_end) &jh3$state %in% states.cdc,]
+count.excess2 <- aggregate(count.excess[,c('excess_pi','covid.track.death')], by=list('state'=count.excess$state) ,FUN=sum)
+
+htmlTable(count.excess2)
+```
+
 
 ```{r}
 ## And finally,  use the NCHS COVID death data
@@ -616,7 +515,7 @@ for(i in 1:length(states.cdc)){
 ```
 
 ## Supp Figure: Extract official data directly from FL 
-This shows that the Johns Hopkins data and NYTimes data are off by ~ 1 week in the date assignments. The Florida data records the 'date case counted', so it is possible this date is not date of death either--If this date is when the case was recognized rather than when they died, for instance.
+This shows that the Johns Hopkins data  are off by ~ 1 week in the date assignments compared to Florida official stats. The Florida data records the 'date case counted', so it is possible this date is not date of death but rather the date when the case was recognized.
 
 ```{r}
 library(pdftools)
@@ -866,5 +765,63 @@ for(i in 1:dim(pred.ac)[2]){
           border = NA)
   }
 }
+```
+
+
+## Supp Figure; Fig 1 Observed vs Expected P&I deaths for *all* states
+```{r, fig.width=8, fig.height=7}
+
+  par(mfrow=c(4,4))
+
+for(i in 1:dim(pred)[2]){
+  for(j in 1:dim(pred)[3]){
+    y.range1<-range(c( pred[select.indices,i,j]/denom[select.indices,i,j],obs[select.indices,i,j]/denom[select.indices,i,j], upi[select.indices,i,j]/denom[select.indices,i,j],0))
+  plot(dates,
+       pred[select.indices,i,j]/denom[select.indices,i,j],
+       type='l',
+       col='red',
+       ylim=y.range1,
+       bty='l',
+       ylab='Proportion',
+       main=paste(states[i],ages[j]))
+
+  points(dates,
+         obs[select.indices,i,j]/denom[select.indices,i,j],
+         type='l',
+         col='black')
+
+  polygon(c(dates,
+            rev(dates)),
+          c(lpi[select.indices,i,j]/denom[select.indices,i,j],
+            rev(upi[select.indices,i,j]/denom[select.indices,i,j])),
+          col = rgb(1, 0, 0, alpha = 0.1),
+          border = NA)
+  }
+}
+```
+
+
+## Supp figure: Fig 2 for all states.
+```{r, fig.width=8, fig.height=7}
+
+  par(mfrow=c(4,4), mar=c(2,4,2,1))
+plot.state.indices <- which(dimnames(pred)[[2]] %in% states.cdc )
+
+for(i in plot.state.indices){
+    y.range1<-c(0,2)
+    ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2[,i])
+    ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
+    cols1<-c(rep('grey',(ncol(ds2.c)-2) ),'red')
+    matplot(ds2.c$epiwk         ,
+       exp(ds2.c[,-1]),
+       type='l',
+       col=cols1,
+       ylim=y.range1,
+       bty='l',
+       lty=1,
+       ylab='Observed/Expected',
+       main=paste(states[i]))
+    abline(h=1, col='black')
+    }
 ```
 
