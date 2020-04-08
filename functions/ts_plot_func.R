@@ -11,7 +11,7 @@ for(i in 1:length(states.plot)){
        ds.select[,death.var],
        type='l',
        col='#e41a1c',
-       ylim=c(0,max(y.range1)),
+       ylim=c(min(y.range1),max(y.range1)),
        bty='l',
        lty=3,
        xlab='',
@@ -25,7 +25,7 @@ for(i in 1:length(states.plot)){
   
   points(ds.select$date         ,
          ds.select$excess_pi/ds.select$percent_complete, type='l', col='#377eb8', lwd=2)
-#  abline(h=1, col='black')
+  abline(h=1, col='grey', lty=2)
   state.name.plot <-  state.name[match(states.plot[i],state.abb)]
  upper <- ds.select$excess_deaths.lpi/ds.select$percent_complete
  lower <- ds.select$excess_deaths.upi/ds.select$percent_complete
@@ -39,10 +39,11 @@ for(i in 1:length(states.plot)){
           c(cl.min, rev(cl.max)),
           col = rgb(0, 0, 1, alpha = 0.05), 
           border = NA)
-    par(new=TRUE)
+  
+    par(new=TRUE, mgp=c(2,0.5,0))
   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
-  axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
-  mtext("Tests per 1000", side=4, line=0.4, col='gray', cex=0.75)
+  axis(side=4,at=c(0,2,4) , labels=c(0,2,4))
+  mtext("Tests per 1000", side=4, line=1.5, col='gray', cex=0.75)
   text(as.Date('2020-01-15'), y2.range.test[2]*0.9,state.name.plot, pos=4)
   
   box(lty = '1111', col = 'lightgray')
