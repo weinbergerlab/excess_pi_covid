@@ -221,6 +221,8 @@ pi.data.clean <- pi.data.clean[!is.na(pi.data.clean$miss.x),]
 pi.data.clean2<- merge( pi.data.clean,clin4.lags, by.x=c('week_start', 'state'), by.y=c('wk_date','state'))
 
 pi.data.clean2<- pi.data.clean2[order(pi.data.clean2$state, pi.data.clean2$week_start),]
+states.cdc <- unique(pi.data.clean2$state)
+
 ```
 
 ```{r, eval=F}
@@ -234,7 +236,6 @@ matplot(cor.lags['percent_pni',-1,], type='l')
 #Is lag of 0,1,or 2 the best?...shows 1 weeks lag best in 20 states,  2 week lag best in 3 states
 table(apply(cor.lags['percent_pni',-1,],2, function(x) which(max(x)==x)))
 
-states.cdc <- unique(pi.data.clean2$state)
 
 ```
 
