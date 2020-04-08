@@ -1,5 +1,5 @@
 ---
-title: 'Estimating '
+title: 'Estimating the early death toll of COVID-19 in the United States'
 author: "Dan Weinberger"
 date: "4/3/2020"
 output:
@@ -39,13 +39,27 @@ source('./functions/ts_plot_func.R')
 
 ## Introduction
 
-There is an immediate need to track the severity and impact of the ongoing epidemic of COVID-19. Even with high-quality surveillance data, estimating the number of deaths caused by a specific pathogen is a challenge. Typically, a large proportion of deaths caused by infectious diseases are not properly attributed to a specific pathogen. With the limited availability of testing for the novel coronavirus and with imperfect sensitivity of the tests, there are undoubtedly a number of deaths caused by the virus that are not counted in official tallies of the death toll of the epidemic. 
+The COVID-19 outbreak  first emerged in December 2019 in Wuhan, China and rapidly grew into a large-scale global pandemic (WHO pandemic declaration). On March 11, 2020 the World Health Organization labeled the ongoing outbreak a pandemic. For all countries impacted by the pandemic, tracking the severity and impact of COVID-19 illness is, at the time of writing, a critical need, hampered by testing issues and reporting lags for key epidemiological indicators. 
 
-When estimating the burden of death due to pneumonia and other respiratory pathogens, it is common to compare the observed incidence of deaths ascribed to pneumonia and influenza (“P&I”) with the incidence of P&I that would be expected at that time of year. These “excess deaths” provide a crude estimate of pathogen-specific burden. 
+Many countries, including the US, were caught off-guard by the rapidity with which COVID-19 spread from China. Without adequate capacity to test for COVID-19 infection for much of February and March 2020, available laboratory-confirmed cases captured only an estimated 10-15% of all infections.  Although most countries have adopted the strategy to preferentially test severe cases, estimating the number of severe infections and deaths caused by COVID-19 will be a challenge. Typically, a large proportion of deaths caused by infectious diseases are not attributed to a specific pathogen. With the limited availability of testing for the novel coronavirus and with imperfect sensitivity of the tests, there have undoubtedly been a number of deaths caused by the virus that are not counted in official tallies of the death toll of the epidemic. Further, in the midst of a large outbreak, there is an unavoidable delay in compilation of death certificates and ascertainment of cause of deaths, which contributes to the “fog of war”. And even in situations of ample testing, deaths from viral pathogens, including COVID-19, can occur indirectly via secondary bacterial infections or exacerbation of chronic conditions . In these indirect pathways, the presence of the virus near the time of death is unlikely and hence undetectable by PCR.
 
-In this study, we compare the reported number of P&I cases across the United States with the number of deaths expected in each week based on the time of year and the intensity of influenza activity. We compare these estimates of excess deaths to the reported numbers of deaths due to COVID-19 in different states and evaluate the trajectories of these increase in relation to increases in influenza-like illness that could be linked to COVID-19. These analyses provide insights into the true burden of COVID-19.
+To estimate the burden of death due to a novel respiratory pathogen, previous studies have compared the observed incidence of deaths ascribed to pneumonia and influenza (“P&I”) with the baseline incidence of P&I that would be expected at that time of year. These “excess deaths” provide a crude estimate of pathogen-specific burden, and this approach was used in the early months of the 2009 influenza H1N1-pdm pandemic. Following the 2009 pandemic, it was estimated that just 1 in  7 deaths in the US caused by influenza were confirmed by laboratory intesting (Simonsen et al, Plos Med 2013 (says so in the abstract --  link https://journals.plos.org/plosmedicine/article?id=10.1371/journal.pmed.1001558, Charu et al IORV 2013). 
+
+In this study, we estimated the increase in P&I deaths across the United States in each week in excess of a seasonal baseline to capture the direct and indirect mortality burden of COVID-19. We compare these estimates of excess deaths to the reported numbers of deaths due to COVID-19 in different states and evaluate the trajectories of these increases in relation to increases in influenza-like illness that could be linked to COVID-19. These analyses provide insights into the true burden of COVID-19 in the early months of the outbreak in the United States.
+
+##METHODS
+**Data**
+Data on deaths due to pneumonia and influenza by state and week were obtained from the National Center for Health Statistics’ (NCHS) mortality surveillance system. The P&I mortality data provide the provisional number of deaths due to pneumonia or influenza and the total number of deaths in each week. The mortality data are available with a 2 week lag. 
+
+State-level data on influenza-like illness (ILI) in each week were obtained from the CDC’s ILINet system, which aggregates data from a network of outpatient providers. State-level data on influenza activity were obtained from the CDC’s National Respiratory and Enteric Virus Surveillance System (NREVSS). This dataset captures the number of tests performed for influenza and the number that were positive by week and state. The ILI data, NREVSS data, and P&I mortality data were accessed through the CDC’s FluView portal using the cdcfluview package in R. The ILI data provide the percent of visits to participating outpatient providers that were for ILI. ILINet and NREVSS data are available with a 1-week lag. 
+Data on reports of laboratory-confirmed deaths due to COVID-19 in each week and state were obtained from several sources, including the covidtracking project, the Hopkins database, and NCHS XX. https://data.cdc.gov/NCHS/Provisional-Death-Counts-for-Coronavirus-Disease-C/hc4f-j6nb  
+https://covidtracking.com/ State-specific testing information was obtained was https://covidtracking.com/
+
+**Analysis**
+We fit Poisson regression models to the weekly state level data on deaths due to pneumonia and influenza. We adjusted for seasonality using harmonics variables and including year-to-year variations using dummy variables. Influenza activity was adjusted for by adjusting for the percent of tests that were positive for influenza in the previous week. The 1 week lag between the testing data and the mortality data is included to account for lags between when a person is tested for influenza and when they die. The same model was fit to data on influenza-like illness. As a sensitivity analysis, we refit the models, excluding the influenza terms to account for possible biases in influenza testing occurring during the COVID-19 epidemic. To calculate the excess number of deaths, we subtracted the expected number of deaths in each week from the observed number of deaths and divided this by the proportion completeness. This correction was used to adjust for under-reporting in recent weeks.   
 
 
+## RESULTS
 
 
 ```{r}
@@ -610,7 +624,12 @@ for(i in 1:length(common.states)){
 }
 
 ```
-
+## DISCUSSION
+Monitoring trends in non-specific causes of death, like P&I, provides a window into the true burden of COVID-19. Given the lack of adequate testing and geographical variability in testing, this type of monitoring provides key information on the severity of the epidemic in different geographic regions. This also provides some indication of the degree to which viral testing is missing deaths due to COVID-19. Our findings suggest that the degree to which deaths due to COVID-19 are being correctly attributed to the virus varies by state. Some states, such as Washington, attributed most of their excess P&I deaths to COVID. In contrast, other states, such as Florida and XX, might have missed deaths early on and might be undercounting deaths by a substantial degree currently. 
+	Non-specific syndromic endpoints, such as deaths due to P&I, outpatient visits for influenza-like illness, and emergency department visits for fever, can provide a crude but informative measure of the progression of the outbreak. These measures themselves can be biased by changes in how diseases or deaths are recorded. However, in the absence of widespread and systematic testing, they provide a useful measure of epidemic progression and could be informative in tracking how interventions like social distancing influence the course of the epidemic.
+	The present COVID-19 pandemic is different from the last four influenza A pandemics, in that the mean age at death is about 80 years.  In this sense, the COVID pandemic is  more like seasonal influenza where most deaths are among elderly, but contrast with the age profile of the 2009 influenza pandemic where the mean age was 37yrs..  Because of this it makes sense to look at complex metrics in addition to estimating the number of excess deaths.  For example, years of life lost. See here https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2843747/
+ 	It is estimated that the epidemic in the US lags that in Europe by 1-2 weeks. Several European countries have experienced high death toll, particularly Italy and Spain. Consolidated excess mortality estimates are not yet available although real-time total mortality data from the EuroMomo project offers a glimpse of the total burden of the epidemic…. We see….
+ 	
 ## Supplementary figure: Excess all-cause deaths
 
 Now instead of modeling the proportion of deaths that were due to pneumonia and influenza, we will model all-caused deaths
