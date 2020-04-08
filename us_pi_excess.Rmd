@@ -218,9 +218,9 @@ return(x)
 pi.data.clean <- do.call('rbind.data.frame',min.state)
 pi.data.clean <- pi.data.clean[!is.na(pi.data.clean$miss.x),]
 
-pi.data.clean2<- merge( pi.data.clean,clin4.lags, by.x=c('wk_start', 'state'), by.y=c('wk_date','state'))
+pi.data.clean2<- merge( pi.data.clean,clin4.lags, by.x=c('week_start', 'state'), by.y=c('wk_date','state'))
 
-pi.data.clean2<- pi.data.clean2[order(pi.data.clean2$state, pi.data.clean2$wk_end),]
+pi.data.clean2<- pi.data.clean2[order(pi.data.clean2$state, pi.data.clean2$week_start),]
 ```
 
 ```{r, eval=F}
@@ -242,7 +242,7 @@ states.cdc <- unique(pi.data.clean2$state)
 #Run analysis
 excess_deaths1.adjusted <-
   excessCases(ds = pi.data.clean2,
-              datevar       = "wk_start",
+              datevar       = "week_start",
               statevar      = "state",
               denom.var     = "all_deaths",
               adj.flu       = "flu_pct_adj_lag1",
@@ -473,7 +473,7 @@ jh3 <- merge(jh3, excess_deaths.upi.m, by=c('state','date') , all=T)
 jh3 <- merge(jh3, total_pi_df.m, by=c('state','date') , all=T)
 jh3 <-jh3[jh3$state %in% states.cdc,]
 
-jh3 <- merge( jh3, pi.data[c('state', 'wk_start','percent_complete')], by.x=c('state','date') , by.y=c('state','wk_start'), all=T)
+jh3 <- merge( jh3, pi.data[c('state', "week_start",'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
 
 jh3 <- jh3[jh3$date >= as.Date('2020-01-01'),]
 jh3$deaths[is.na(jh3$deaths)] <- 0
@@ -484,7 +484,7 @@ jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
 jh3 <- jh3[ !is.na(jh3$deaths), ]
 
 #Only plot out to 1 week ahead of the US P&I data
-jh3 <- jh3[ jh3$date <= max(pi.data$wk_start +7),]
+jh3 <- jh3[ jh3$date <= max(pi.data$"week_start" +7),]
 
 ```
 
@@ -495,6 +495,7 @@ jh3 <- jh3[ jh3$date <= max(pi.data$wk_start +7),]
 
 
 ```
+
 ```{r, fig.width=6, fig.height=6}
 ## Alternate Fig 3: covidtracking.com data
 
@@ -503,9 +504,11 @@ ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=plot.states
 
 
 ```
-Count number of excess cases since Jan 1 to most recent weke when P&I data available
+
+## Table 1
+
 ```{r}
-count.excess <-jh3[jh3$date >= as.Date('2020-01-01') & jh3$date <=max(pi.data$wk_end) &jh3$state %in% states.cdc,]
+count.excess <-jh3[jh3$date >= as.Date('2020-01-01') & jh3$date <=max(pi.data$week_end) &jh3$state %in% states.cdc,]
 count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
 count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
 count.excess$approx.var <- ((count.excess$excess_deaths.upi -count.excess$excess_pi)/2)^2/count.excess$percent_complete
@@ -519,8 +522,8 @@ count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count
 
 
 count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'covid.track.death')]
-
-last.date.format<-max(pi.data$wk_end)
+names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'reported COVID019 deaths')
+last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
 
@@ -616,7 +619,7 @@ pi.data.clean2$one <- 1
 pi.data.clean2$percent_complete.adj <-pi.data.clean2$percent_complete - 0.5
 excess_deaths1.ac <-
   excessCases(ds = pi.data.clean2,
-              datevar       = "wk_start",
+              datevar       = "week_start",
               statevar      = "state",
               denom.var     = "percent_complete.adj",
               adj.flu       = "flu_pct_adj_lag1",
