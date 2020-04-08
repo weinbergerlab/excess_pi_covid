@@ -42,7 +42,7 @@ for(i in 1:length(states.plot)){
     par(new=TRUE)
   plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
   axis(side=4,at=c(0,1,2,3,4,5) , labels=F)
-  mtext("Tests per 1000", side=4, line=0.2, col='gray', cex=0.75)
+  mtext("Tests per 1000", side=4, line=0.4, col='gray', cex=0.75)
   text(as.Date('2020-01-15'), y2.range.test[2]*0.9,state.name.plot, pos=4)
   
   box(lty = '1111', col = 'lightgray')
