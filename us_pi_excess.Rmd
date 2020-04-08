@@ -524,20 +524,36 @@ ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=plot.states
 
 ```{r}
 count.excess <-jh3[jh3$date >= as.Date('2020-01-01') & jh3$date <=max(pi.data$week_end) &jh3$state %in% states.cdc,]
+
 count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
+
 count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
+
 count.excess$approx.var <- ((count.excess$excess_deaths.upi -count.excess$excess_pi)/2)^2/count.excess$percent_complete
+
 count.excess2 <- aggregate(count.excess[,c('excess_pi','total_pi','covid.track.death','approx.var')], by=list('state'=count.excess$state) ,FUN=sum)
+
+count.excess2 <- merge(count.excess2, pop1, by='state')
 
 count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$approx.var))
 
 count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$approx.var))
 
+count.excess2$exces_ci_ucl_INC <- count.excess2$excess_pi + 1.96*sqrt(count.excess2$approx.var)/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$exces_ci_lcl_INC <- count.excess2$excess_pi - 1.96*sqrt(count.excess2$approx.var)/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$exces_pi_INC <- count.excess2$excess_pi/count.excess2$census_bureau_pop_2019*1000000
+
 count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
+count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), '(',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
+
+#sort by count
+count.excess2 <- count.excess2[rev(order(count.excess2$excess_pi)),]
 
 
-count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'covid.track.death')]
-names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'reported COVID019 deaths')
+count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'excess_pi_ci_INC','covid.track.death')]
+names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Excess P&I deaths/1,000,000 people','Reported COVID019 deaths')
 last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
