@@ -21,6 +21,14 @@ knitr::opts_chunk$set(
 )
 ```
 
+
+```{r, eval=F}
+if (!require("devtools")) {
+  install.packages("devtools")
+}
+devtools::install_github("weinbergerlab/ExcessILI")
+```
+
 ```{r setup}
 library(ExcessILI)
 library(cdcfluview)
@@ -331,6 +339,10 @@ rr <-  excessExtract(ds = ds,
 excess_deaths <- excessExtract(ds = ds,
                 syndrome = syndrome.select,
                 extract.quantity = "unexplained.cases")
+
+excess_deaths_var <- excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "pred.var")
 ```
 
 ## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
@@ -469,6 +481,11 @@ excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
 excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
 names(excess_deaths.m) <-c('date','state','excess_pi')
 
+excess_deaths_var
+excess_deaths.var.df <- cbind.data.frame('date'=dates1,excess_deaths_var[,,1])
+excess_deaths.var.m <- melt(excess_deaths.var.df, id.vars =c('date'))
+names(excess_deaths.var.m) <-c('date','state','excess_pi_var')
+
 excess_deaths.upi.df <- cbind.data.frame('date'=dates1,  (obs[,,1]-lpi[,,1] ))
 excess_deaths.upi.m <- melt(excess_deaths.upi.df, id.vars =c('date'))
 names(excess_deaths.upi.m) <-c('date','state','excess_deaths.upi')
@@ -486,7 +503,10 @@ jh3 <- merge(jh2.agg, excess_deaths.m, by=c('state','date') , all=T)
 jh3 <- merge(jh3, excess_deaths.lpi.m, by=c('state','date') , all=T)
 jh3 <- merge(jh3, excess_deaths.upi.m, by=c('state','date') , all=T)
 jh3 <- merge(jh3, total_pi_df.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, excess_deaths.var.m, by=c('state','date') , all=T)
+
 jh3 <-jh3[jh3$state %in% states.cdc,]
+
 
 jh3 <- merge( jh3, pi.data[c('state', "week_start",'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
 
@@ -529,31 +549,29 @@ count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complet
 
 count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
 
-count.excess$approx.var <- ((count.excess$excess_deaths.upi -count.excess$excess_pi)/2)^2/count.excess$percent_complete
-
-count.excess2 <- aggregate(count.excess[,c('excess_pi','total_pi','covid.track.death','approx.var')], by=list('state'=count.excess$state) ,FUN=sum)
+count.excess2 <- aggregate(count.excess[,c('excess_pi','total_pi','covid.track.death','excess_pi_var')], by=list('state'=count.excess$state) ,FUN=sum)
 
 count.excess2 <- merge(count.excess2, pop1, by='state')
 
-count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$approx.var))
+count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))
 
-count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$approx.var))
+count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))
 
-count.excess2$exces_ci_ucl_INC <- count.excess2$excess_pi + 1.96*sqrt(count.excess2$approx.var)/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_ucl_INC <- count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var)/count.excess2$census_bureau_pop_2019*1000000
 
-count.excess2$exces_ci_lcl_INC <- count.excess2$excess_pi - 1.96*sqrt(count.excess2$approx.var)/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_lcl_INC <- count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var)/count.excess2$census_bureau_pop_2019*1000000
 
 count.excess2$exces_pi_INC <- count.excess2$excess_pi/count.excess2$census_bureau_pop_2019*1000000
 
 count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
-count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), '(',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
+count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), ' (',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
 
 #sort by count
 count.excess2 <- count.excess2[rev(order(count.excess2$excess_pi)),]
 
 
-count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'excess_pi_ci_INC','covid.track.death')]
-names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Excess P&I deaths/1,000,000 people','Reported COVID019 deaths')
+count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
+names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Reported COVID-19 deaths','Excess P&I deaths/1,000,000 people')
 last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
