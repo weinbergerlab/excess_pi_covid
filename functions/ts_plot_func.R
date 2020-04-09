@@ -8,7 +8,7 @@ y2.range.test <- range(ds.plot$test.week.per.capita, na.rm=T)
 for(i in plot.state.indices){
   ds.select <- ds.plot[ds.plot$state==states.cdc[i],]
   ave_pi <- mean(ds.select$total_pi, na.rm=T)
-  ave.range <- c(-ave_pi*0.3, ave_pi*0.5)
+  ave.range <- c(-ave_pi*0.3, ave_pi*0.7)
   y.range1<-range(c(ds.select[,death.var], ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
   ds.select$death.early <- ds.select[,death.var]
   ds.select$death.early[is.na(ds.select$excess_pi)] <- NA

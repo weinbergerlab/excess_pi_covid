@@ -17,7 +17,8 @@ knitr::opts_chunk$set(
   echo=F,
   warning=FALSE, 
   message=FALSE,
-  comment = "#>"
+  comment = "#>",
+  dev=c('png','pdf')
 )
 ```
 
@@ -44,30 +45,6 @@ library(htmlTable)
 library(RSocrata)
 source('./functions/ts_plot_func.R')
 ```
-
-## Introduction
-
-The COVID-19 outbreak  first emerged in December 2019 in Wuhan, China and rapidly grew into a large-scale global pandemic (WHO pandemic declaration). On March 11, 2020 the World Health Organization labeled the ongoing outbreak a pandemic. For all countries impacted by the pandemic, tracking the severity and impact of COVID-19 illness is, at the time of writing, a critical need, hampered by testing issues and reporting lags for key epidemiological indicators. 
-
-Many countries, including the US, were caught off-guard by the rapidity with which COVID-19 spread from China. Without adequate capacity to test for COVID-19 infection for much of February and March 2020, available laboratory-confirmed cases captured only an estimated 10-15% of all infections.  Although most countries have adopted the strategy to preferentially test severe cases, estimating the number of severe infections and deaths caused by COVID-19 will be a challenge. Typically, a large proportion of deaths caused by infectious diseases are not attributed to a specific pathogen. With the limited availability of testing for the novel coronavirus and with imperfect sensitivity of the tests, there have undoubtedly been a number of deaths caused by the virus that are not counted in official tallies of the death toll of the epidemic. Further, in the midst of a large outbreak, there is an unavoidable delay in compilation of death certificates and ascertainment of cause of deaths, which contributes to the “fog of war”. And even in situations of ample testing, deaths from viral pathogens, including COVID-19, can occur indirectly via secondary bacterial infections or exacerbation of chronic conditions . In these indirect pathways, the presence of the virus near the time of death is unlikely and hence undetectable by PCR.
-
-To estimate the burden of death due to a novel respiratory pathogen, previous studies have compared the observed incidence of deaths ascribed to pneumonia and influenza (“P&I”) with the baseline incidence of P&I that would be expected at that time of year. These “excess deaths” provide a crude estimate of pathogen-specific burden, and this approach was used in the early months of the 2009 influenza H1N1-pdm pandemic. Following the 2009 pandemic, it was estimated that just 1 in  7 deaths in the US caused by influenza were confirmed by laboratory intesting (Simonsen et al, Plos Med 2013 (says so in the abstract --  link https://journals.plos.org/plosmedicine/article?id=10.1371/journal.pmed.1001558, Charu et al IORV 2013). 
-
-In this study, we estimated the increase in P&I deaths across the United States in each week in excess of a seasonal baseline to capture the direct and indirect mortality burden of COVID-19. We compare these estimates of excess deaths to the reported numbers of deaths due to COVID-19 in different states and evaluate the trajectories of these increases in relation to increases in influenza-like illness that could be linked to COVID-19. These analyses provide insights into the true burden of COVID-19 in the early months of the outbreak in the United States.
-
-##METHODS
-**Data**
-Data on deaths due to pneumonia and influenza by state and week were obtained from the National Center for Health Statistics’ (NCHS) mortality surveillance system. The P&I mortality data provide the provisional number of deaths due to pneumonia or influenza and the total number of deaths in each week. The mortality data are available with a 2 week lag. 
-
-State-level data on influenza-like illness (ILI) in each week were obtained from the CDC’s ILINet system, which aggregates data from a network of outpatient providers. State-level data on influenza activity were obtained from the CDC’s National Respiratory and Enteric Virus Surveillance System (NREVSS). This dataset captures the number of tests performed for influenza and the number that were positive by week and state. The ILI data, NREVSS data, and P&I mortality data were accessed through the CDC’s FluView portal using the cdcfluview package in R. The ILI data provide the percent of visits to participating outpatient providers that were for ILI. ILINet and NREVSS data are available with a 1-week lag. 
-Data on reports of laboratory-confirmed deaths due to COVID-19 in each week and state were obtained from several sources, including the covidtracking project, the Hopkins database, and NCHS XX. https://data.cdc.gov/NCHS/Provisional-Death-Counts-for-Coronavirus-Disease-C/hc4f-j6nb  
-https://covidtracking.com/ State-specific testing information was obtained was https://covidtracking.com/
-
-**Analysis**
-We fit Poisson regression models to the weekly state level data on deaths due to pneumonia and influenza. We adjusted for seasonality using harmonics variables and including year-to-year variations using dummy variables. Influenza activity was adjusted for by adjusting for the percent of tests that were positive for influenza in the previous week. The 1 week lag between the testing data and the mortality data is included to account for lags between when a person is tested for influenza and when they die. The same model was fit to data on influenza-like illness. As a sensitivity analysis, we refit the models, excluding the influenza terms to account for possible biases in influenza testing occurring during the COVID-19 epidemic. To calculate the excess number of deaths, we subtracted the expected number of deaths in each week from the observed number of deaths and divided this by the proportion completeness. This correction was used to adjust for under-reporting in recent weeks.   
-
-
-## RESULTS
 
 
 ```{r}
@@ -297,6 +274,21 @@ table(apply(cor.lags['percent_pni',-1,],2, function(x) which(max(x)==x)))
 
 ```
 
+## Abstract
+Mortality data on deaths due to pneumonia&influenza through the week ending `r  max(dates1)+7`
+
+*Background*
+Tracking the severity and public health impact of emerging diseases, such as the novel coronavirus diseases COVID-19, is a critical need. These efforts are often hampered by testing issues and reporting lags for key epidemiological data. Evaluating unexplained increases in deaths attributed to non-specific causes, such as pneumonia, can provide a more complete picture of the burden caused by COVID-19. 
+
+*Methods*
+We evaluated increases in the occurrence of deaths due to P&I above a seasonal baseline across the United States and compared the rate of excess deaths to reported rates of death due to COVID-19, as well as state-level coronavirus testing rates and excess rates of influenza-like illness. 
+
+*Results*
+There were notable increases in the rate of death due to pneumonia and influenza. In a number of states, these increases pre-dated the increase in testing rates and went uncounted. There was substantial variability between states in the discrepancy between reported rates of death due to COVID-19 and the estimated burden of excess deaths due to P&I. In some states, the burden of reported deaths was 10-fold lower than the burden of excess deaths due to P&I. 
+
+*Conclusions*
+Given the lack of consistent virological testing, tracking spikes in deaths due to non-specific causes provides the most complete estimate of the burden of COVID-19. This approach provides a framework for tracking the progression of the epidemic and its public health impact. 
+
 ```{r, include=F}
 #Run analysis
 excess_deaths1.adjusted <-
@@ -382,16 +374,15 @@ excess_deaths_var <- excessExtract(ds = ds,
 ```
 
 ## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
- 
-```{r}
+ The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+7`.
+
+```{r fig1}
 n.days <- 52
 select.indices <- (length(dates1)-n.days):length(dates1)
 dates<-dates1[select.indices]
 states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
 ```
-
-The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+7`.
 
 ```{r, fig.width=7.3, fig.height=5.5}
 
@@ -437,6 +428,7 @@ for(i in plot.state.indices){
 ```
 
 ## Figure 2: Observed deaths/expected deaths by state
+Excess Deaths due to pneumonia and influenza
 
 ```{r, echo=F}
 rr2<-rr[,,1]
@@ -452,7 +444,7 @@ check<-cbind.data.frame(date.mmwrdates,mmwr.epiwk, mmwr.epiyr)
 
 These plots show the Observed/Expected number of deaths due to pneumonia and influenza in each week for the 2019-20 year (red) compared to previous years (gray). Values close to 1 indicate that the values for that week are close to what would be expected based on the time of year and influenza activity.
 
-```{r, fig.width=7.3, fig.height=5.5}
+```{r fig2, fig.width=7.3, fig.height=5.5}
 
   par(mfrow=c(4,4), mar=c(2,4,2,1))
 states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
@@ -579,7 +571,7 @@ jh3 <- jh3[jh3$state %in% states.cdc,]
 #jh3 <-jh3[!is.na(jh3$excess_pi ),]
 ```
 
-```{r, fig.width=7.3, fig.height=5.5}
+```{r fig3, fig.width=7.3, fig.height=5.5}
 ## uses covidtracking.com data for reported deaths
 
 par(mfrow=c(4,4), mar=c(2,2,1,3))
@@ -588,9 +580,9 @@ ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=unique(jh3$
 
 ```
 
-## Table 1
+## Table 1: Excess P&I deaths and reported deaths due to COVID-19
 
-```{r}
+```{r, table1}
 count.excess <-jh3[jh3$date >= as.Date('2020-02-09') & jh3$date <=max(pi.data$week_end) ,]
 
 count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
@@ -638,6 +630,7 @@ htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneum
 ## Figure 4: Compare Excess P&I mortality vs Excess ILI
 
 Here we compare the observed vs expected number of deaths due to pneumonia and influenza in each week compare to the observed vs expected number of outpatient visits for influenza-like illness (ILI) in each week. we would expect ILI (blue line) to increase earlier than deaths (red line)
+
 ```{r, include=F}
 ili.data <- ilinet(region = c("state"))
 ili.data$state <- state.abb[match(ili.data$region, state.name)]
