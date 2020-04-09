@@ -1,8 +1,14 @@
 ts.plot.func <-function(ds.plot=jh3, death.var='deaths' ,states.plot=states.cdc ){
   
+  states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
+                        states.cdc[!(states.cdc %in% state.abb)]) 
+  plot.state.indices <- match( states.cdc.order,unique(ds.plot$state)  )
+  
 y2.range.test <- range(ds.plot$test.week.per.capita, na.rm=T)
-for(i in 1:length(states.plot)){
-  ds.select <- ds.plot[ds.plot$state==states.plot[i],]
+for(i in plot.state.indices){
+  ds.select <- ds.plot[ds.plot$state==states.cdc[i],]
+  ave_pi <- mean(ds.select$total_pi, na.rm=T)
+  ave.range <- c(-ave_pi*0.3, ave_pi*0.5)
   y.range1<-range(c(ds.select[,death.var], ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
   ds.select$death.early <- ds.select[,death.var]
   ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
@@ -11,7 +17,7 @@ for(i in 1:length(states.plot)){
        ds.select[,death.var],
        type='l',
        col='#e41a1c',
-       ylim=c(min(y.range1),max(y.range1)),
+       ylim=ave.range,
        bty='l',
        lty=3,
        xlab='',
@@ -25,8 +31,14 @@ for(i in 1:length(states.plot)){
   
   points(ds.select$date         ,
          ds.select$excess_pi/ds.select$percent_complete, type='l', col='#377eb8', lwd=2)
-  abline(h=1, col='grey', lty=2)
-  state.name.plot <-  state.name[match(states.plot[i],state.abb)]
+  abline(h=0, col='grey', lty=2)
+  #state.name.plot <-  state.name[match(states.cdc[i],state.abb)]
+  if(states[i] %in% state.abb ){
+    state.name.plot <-    
+      state.name[match(states.cdc[i],state.abb)]
+  }else{
+    state.name.plot <- states.cdc[i]
+  }
  upper <- ds.select$excess_deaths.lpi/ds.select$percent_complete
  lower <- ds.select$excess_deaths.upi/ds.select$percent_complete
  pis <- cbind(upper, lower)
@@ -41,10 +53,10 @@ for(i in 1:length(states.plot)){
           border = NA)
   
     par(new=TRUE, mgp=c(2,0.5,0))
-  plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=2, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
-  axis(side=4,at=c(0,2,4) , labels=c(0,2,4))
-  mtext("Tests per 1000", side=4, line=1.5, col='gray', cex=0.75)
-  text(as.Date('2020-01-15'), y2.range.test[2]*0.9,state.name.plot, pos=4)
+  plot(ds.select$date, ds.select$test.week.per.capita, ylim=y2.range.test, type='l', lty=3, lwd=0.5, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
+  axis(side=4,at=c(0,2,4) , labels=c(0,2,4), col.ticks='gray', col='gray', col.lab='gray' ,col.axis='gray')
+  mtext("Tests/1000", side=4, line=1.5, col='gray', cex=0.75)
+  text(as.Date('2020-02-06'), y2.range.test[2]*0.9,state.name.plot, pos=4, cex=0.85)
   
   box(lty = '1111', col = 'lightgray')
 }

@@ -71,15 +71,31 @@ We fit Poisson regression models to the weekly state level data on deaths due to
 
 
 ```{r}
-## Download the mortality data
-#pi.data.alt <- read.socrata("https://data.cdc.gov/resource/pp7x-dyj2.json")
-#pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
-pi.data <- pi_mortality(coverage_area='state')
-pi.data$percent_complete[pi.data$percent_complete > 1] <- 1
+plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','WA' )
 ```
 
+
 ```{r}
-plot.states <- c('CA', 'FL','GA','ID','IL', 'LA','MA','MI','MO', 'MT', 'NJ', 'NY', 'OR', 'PA', 'WA' )
+#cross walk file to map  states to hhs regions
+# 
+hhs_states <- cdcfluview::hhs_regions
+hhs_states$state <- state.abb[match(hhs_states$state_or_territory, state.name)]
+hhs_states$state_region <- hhs_states$region
+hhs_states$state_region[hhs_states$state %in% plot.states] <- hhs_states$state[hhs_states$state %in% plot.states]
+hhs_states <- hhs_states[,c('state','state_region')]
+hhs_states$state_region <- gsub(' ','', hhs_states$state_region)
+hhs_states.cw <- hhs_states[!is.na(hhs_states$state),]
+
+hhs_states.cw.spl <- split(hhs_states.cw, hhs_states.cw$state_region)
+
+hhs_states.cw.spl <-lapply(hhs_states.cw.spl, function(x) {
+  x$state_region.lab <- paste(x$state, collapse=',')
+  return(x)
+  }
+)
+
+hhs_states.cw <-do.call('rbind.data.frame',hhs_states.cw.spl)
+hhs_states.cw$state_region[hhs_states.cw$state_region != hhs_states.cw$state] <- hhs_states.cw$state_region.lab[hhs_states.cw$state_region != hhs_states.cw$state]
 ```
 
 ```{r}
@@ -114,7 +130,16 @@ pop1$state <- state.abb[match(pop1$state_name, state.name)]
 pop1$census_bureau_pop_2019 <- gsub( ',', '',pop1$census_bureau_pop_2019)
 pop1$census_bureau_pop_2019 <-as.numeric(pop1$census_bureau_pop_2019)
 
+pop1.reg <- merge(pop1, hhs_states.cw, by='state')
+pop2 <- aggregate(pop1.reg[,"census_bureau_pop_2019"], by=list('state'=pop1.reg$state_region), FUN=sum)
+names(pop2) <- c('state','census_bureau_pop_2019')
+
 test.ds2 <- merge(test.ds, pop1, by='state')
+
+test.ds2 <- merge(test.ds2, hhs_states.cw, by='state')
+
+test.ds2 <- aggregate(test.ds2[,c('cum.tests','census_bureau_pop_2019','cov.track.cum.death')], by=list('state'=test.ds2[, 'state_region'], 'test.dates'=test.ds2$test.dates ), FUN=sum)
+
 test.ds2$cum.test.per.capita <- test.ds2$cum.tests/test.ds2$census_bureau_pop_2019*1000
 test.ds2 <- test.ds2[, c('state','cum.test.per.capita', 'test.dates','cov.track.cum.death')]
 
@@ -142,12 +167,16 @@ test.ds3.spl <-do.call('rbind.data.frame', test.ds2.spl)
 nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
   
   clin <- nrevvs.state[["clinical_labs"]]
+  clin$state <- state.abb[match(clin$region, state.name)]
   
-  data(cdcfluview::hhs_regions)
+  #data(cdcfluview::hhs_regions)
   
-  cw.file <- cdcfluview::hhs_regions
+  #cw.file <- cdcfluview::hhs_regions
   
-  clin2 <- merge(clin, cw.file,
+  clin2 <- merge(clin, hhs_states.cw,
+                 by = "state")
+
+  clin2 <- merge(clin2, cw.file,
                  by.x = "region",
                  by.y = "state_or_territory")
   
@@ -155,12 +184,19 @@ nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
     c('region', 'region_number',
       'year', 'week', 'wk_date',
       'total_a','total_b',
-      'total_specimens')
+      'total_specimens','state_region')
   
   clin2 <- clin2[, clin2.subsetvars]
   
   names(clin2)[1:2] <- c("state", "hhs_region")
   
+  clin2$total_specimens <- as.numeric(clin2$total_specimens)
+  clin2$total_a <- as.numeric(clin2$total_a)
+  clin2$total_b <- as.numeric(clin2$total_b)
+  
+  clin2 <- aggregate(clin2[, c('total_specimens','total_a','total_b')], by=list('state'=clin2$state_region, 'wk_date'=clin2$wk_date,'hhs_region'=clin2$hhs_region), FUN=sum, na.rm=T)
+  
+  ##Florida doesn't have ILI data, so use regions ILI dat
   nrevvs_hhs <- cdcfluview::who_nrevss(region = c("hhs"))
   
   clin.hhs <- nrevvs_hhs[["clinical_labs"]]
@@ -181,39 +217,25 @@ nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
   
   clin3 <- merge(clin2, clin.hhs,
                  by = c("hhs_region", "wk_date"))
+
+  #If no specimens for state, use HHS region estimates
+  clin3$total_specimens[clin3$total_specimens==0] <-
+    clin3$hhs_total_specimens[clin3$total_specimens==0]
   
-  clin3$total_a[is.na(clin3$total_a)] <-
-    clin3$hhs_total_a[is.na(clin3$total_a)]
+  clin3$total_a[clin3$total_specimens==0] <-
+    clin3$hhs_total_a[clin3$total_specimens==0]
   
-  clin3$total_b[is.na(clin3$total_b)] <-
-    clin3$hhs_total_b[is.na(clin3$total_b)]
+  clin3$total_b[clin3$total_specimens==0] <-
+    clin3$hhs_total_b[clin3$total_specimens==0]
   
-  clin3$total_specimens[is.na(clin3$total_specimens)] <-
-    clin3$hhs_total_specimens[is.na(clin3$total_specimens)]
-  
-  clin3$state.abb <- state.abb[match(clin3$state, state.name)]
-  
-  names(clin3) <-
-    c("hhs_region",
-      "wk_date",
-      "state_name",
-      "MMWRyear", "MMWRweek",
-      "total_a",'total_b',
-      'total_specimens',
-      'total_a_hhs', "total_b_hhs",
-      'total_specimens_hhs',
-      "state")
-  
-  clin3$total_a         <- as.numeric(clin3$total_a)
-  clin3$total_b         <- as.numeric(clin3$total_b)
   clin3$total_specimens <- as.numeric(clin3$total_specimens)
-  clin3$flu_pct_adj     <- (clin3$total_a + clin3$total_b + 0.5) / 
-    (clin3$total_specimens + 0.5)
-  clin3$fluN            <- clin3$total_a + clin3$total_b + 0.5
-  clin3$flu.var         <- clin3$flu_pct_adj
+  clin3$total_a <- as.numeric(clin3$total_a)
+  clin3$total_b <- as.numeric(clin3$total_b)  
   
-  clin4<-clin3[,c('state','flu_pct_adj', 'wk_date')]
+  clin3$flu_pct_adj <- (clin3$total_a + clin3$total_b)/clin3$total_specimens
   
+   clin4<-clin3[,c('state','flu_pct_adj', 'wk_date')]
+
   clin4.lag1<-clin4
   clin4.lag1$wk_date <- clin4$wk_date + days(7)
   names(clin4.lag1) <-c('state','flu_pct_adj_lag1','wk_date')
@@ -231,9 +253,23 @@ clin4.lags <- merge(clin4.lags, clin4.lag2, by=c('state','wk_date'))
 ```{r, include=F}
 #Format and fill mssings with 0s
 
+## Download the mortality data
+#pi.data.alt <- read.socrata("https://data.cdc.gov/resource/pp7x-dyj2.json")
+#pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
+pi.data <- pi_mortality(coverage_area='state')
+pi.data$percent_complete[pi.data$percent_complete > 1] <- 1
+
 pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
 pi.data$state[pi.data$region_name == 'New York City'] <- 'NYC'
-spl1<-split(pi.data, pi.data$state)
+
+pi.data <- merge(pi.data,hhs_states.cw, by='state', all=T)
+pi.data$state_region[pi.data$state=='NYC'] <- 'NYC'
+pi.data$pct.comp.wgt <- pi.data$percent_complete*pi.data$all_deaths
+
+pi.data.agg <- aggregate(pi.data[,c('total_pni','all_deaths','pct.comp.wgt')], by=list('state'=pi.data$state_region, 'week_start'=pi.data$week_start, 'week_end'=pi.data$week_end), FUN=sum)
+pi.data.agg$percent_complete <- pi.data.agg$pct.comp.wgt/pi.data.agg$all_deaths
+
+spl1<-split(pi.data.agg, pi.data.agg$state)
 min.state <- lapply(spl1, function(x){ x$miss.x<-min(x$total_pni)
 return(x)
                 })
@@ -357,16 +393,21 @@ ages <- dimnames(pred)[[3]]
 
 The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+7`.
 
-```{r, fig.width=6, fig.height=8}
+```{r, fig.width=7.3, fig.height=5.5}
 
-  par(mfrow=c(5,3), mar=c(2,4,2,1))
-
-plot.state.indices <- which(dimnames(pred)[[2]] %in% plot.states )
+  par(mfrow=c(4,4), mar=c(2,4,2,1))
+states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
+                      states.cdc[!(states.cdc %in% state.abb)]) 
+plot.state.indices <- match( states.cdc.order,dimnames(pred)[[2]]  )
 for(i in plot.state.indices){
   for(j in 1:dim(pred)[3]){
     y.range1<-range(c( pred[select.indices,i,j]/denom[select.indices,i,j],obs[select.indices,i,j]/denom[select.indices,i,j], upi[select.indices,i,j]/denom[select.indices,i,j],0))
-      state.name.plot <-  state.name[match(states[i],state.abb)]
-
+    if(states[i] %in% state.abb ){
+      state.name.plot <-    
+      state.name[match(states[i],state.abb)]
+    }else{
+    state.name.plot <- states[i]
+  }
   plot(dates,
        pred[select.indices,i,j]/denom[select.indices,i,j],
        type='l',
@@ -378,7 +419,7 @@ for(i in plot.state.indices){
        #main=paste(states[i])
        )
   
-  text(x=as.Date('2019-03-01'),y=0.005, state.name.plot, pos=4)
+  text(x=as.Date('2019-03-01'),y=0.005, state.name.plot, pos=4,cex=0.9)
 
   points(dates,
          obs[select.indices,i,j]/denom[select.indices,i,j],
@@ -411,16 +452,28 @@ check<-cbind.data.frame(date.mmwrdates,mmwr.epiwk, mmwr.epiyr)
 
 These plots show the Observed/Expected number of deaths due to pneumonia and influenza in each week for the 2019-20 year (red) compared to previous years (gray). Values close to 1 indicate that the values for that week are close to what would be expected based on the time of year and influenza activity.
 
-```{r, fig.width=6, fig.height=8}
+```{r, fig.width=7.3, fig.height=5.5}
 
-  par(mfrow=c(5,3), mar=c(2,4,2,1))
-plot.state.indices <- which(dimnames(pred)[[2]] %in% plot.states )
+  par(mfrow=c(4,4), mar=c(2,4,2,1))
+states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
+                      states.cdc[!(states.cdc %in% state.abb)]) 
+plot.state.indices <- match( states.cdc.order,dimnames(pred)[[2]]  )
+
+#plot.state.indices <- which(dimnames(pred)[[2]] %in% plot.states )
 
 for(i in plot.state.indices){
-    y.range1<-c(0,2)
+    y.range1<-c(0.5,1.5)
     ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2[,i])
     ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
     cols1<-c(rep('grey',(ncol(ds2.c)-2) ),'red')
+    
+    if(states[i] %in% state.abb ){
+      state.name.plot <-    
+      state.name[match(states[i],state.abb)]
+    }else{
+    state.name.plot <- states[i]
+    }
+    
     matplot(ds2.c$epiwk         ,
        exp(ds2.c[,-1]),
        type='l',
@@ -428,9 +481,9 @@ for(i in plot.state.indices){
        ylim=y.range1,
        bty='l',
        lty=1,
-       ylab='Observed/Expected',
-       main=paste(states[i]))
+       ylab='Observed/Expected')
     abline(h=1, col='black')
+     text(x=ds2.c$epiwk[1]*1.0 , y=y.range1[1]*1.08 , state.name.plot, pos=4, cex=0.9)
     }
 ```
 
@@ -474,14 +527,16 @@ jh2$state <- state.abb[match(jh2$state, state.name)]
 #round date to sunday
 jh2$date <-floor_date(jh2$date, 'week')
 
-jh2.agg<- aggregate( jh2$deaths, by=list('state'=jh2$state, 'date'=jh2$date), FUN=sum)
+jh2 <- merge(jh2, hhs_states.cw, by='state')
+
+jh2.agg<- aggregate( jh2$deaths, by=list('state'=jh2$state_region, 'date'=jh2$date), FUN=sum)
 names(jh2.agg) <- c('state', 'date', 'deaths')
 
 excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
 excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
 names(excess_deaths.m) <-c('date','state','excess_pi')
 
-excess_deaths_var
+#excess_deaths_var
 excess_deaths.var.df <- cbind.data.frame('date'=dates1,excess_deaths_var[,,1])
 excess_deaths.var.m <- melt(excess_deaths.var.df, id.vars =c('date'))
 names(excess_deaths.var.m) <-c('date','state','excess_pi_var')
@@ -505,12 +560,12 @@ jh3 <- merge(jh3, excess_deaths.upi.m, by=c('state','date') , all=T)
 jh3 <- merge(jh3, total_pi_df.m, by=c('state','date') , all=T)
 jh3 <- merge(jh3, excess_deaths.var.m, by=c('state','date') , all=T)
 
-jh3 <-jh3[jh3$state %in% states.cdc,]
+#jh3 <-jh3[jh3$state %in% states.cdc,]
 
 
-jh3 <- merge( jh3, pi.data[c('state', "week_start",'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
+jh3 <- merge( jh3, pi.data.clean2[c('state', "week_start",'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
 
-jh3 <- jh3[jh3$date >= as.Date('2020-01-01'),]
+jh3 <- jh3[jh3$date >= as.Date('2020-02-09'),] #2 weeks before 1st reported deaths by CDC
 jh3$deaths[is.na(jh3$deaths)] <- 0
 
 jh3 <- merge(jh3, test.ds3.spl, by.x=c('state','date'), by.y=c('state','test.dates'), all=T)
@@ -520,22 +575,15 @@ jh3 <- jh3[ !is.na(jh3$deaths), ]
 
 #Only plot out to 1 week ahead of the US P&I data
 jh3 <- jh3[ jh3$date <= max(pi.data$"week_start" +7),]
-
+jh3 <- jh3[jh3$state %in% states.cdc,]
+#jh3 <-jh3[!is.na(jh3$excess_pi ),]
 ```
 
-```{r, fig.width=6, fig.height=6}
-#par(mfrow=c(5,3), mar=c(2,3,1,2))
-#could use 'states.cdc' or plot.states
-#ts.plot.func(ds.plot=jh3, death.var='deaths' #,states.plot=plot.states )
+```{r, fig.width=7.3, fig.height=5.5}
+## uses covidtracking.com data for reported deaths
 
-
-```
-
-```{r, fig.width=6, fig.height=6}
-## Alternate Fig 3: covidtracking.com data
-
-par(mfrow=c(5,3), mar=c(2,4,1,3))
-ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=plot.states )
+par(mfrow=c(4,4), mar=c(2,2,1,3))
+ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=unique(jh3$state) )
 
 
 ```
@@ -543,7 +591,7 @@ ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=plot.states
 ## Table 1
 
 ```{r}
-count.excess <-jh3[jh3$date >= as.Date('2020-01-01') & jh3$date <=max(pi.data$week_end) &jh3$state %in% states.cdc,]
+count.excess <-jh3[jh3$date >= as.Date('2020-02-09') & jh3$date <=max(pi.data$week_end) ,]
 
 count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
 
@@ -551,23 +599,23 @@ count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
 
 count.excess2 <- aggregate(count.excess[,c('excess_pi','total_pi','covid.track.death','excess_pi_var')], by=list('state'=count.excess$state) ,FUN=sum)
 
-count.excess2 <- merge(count.excess2, pop1, by='state')
+count.excess2 <- merge(count.excess2, pop2, by='state')
 
 count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))
 
 count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))
 
-count.excess2$exces_ci_ucl_INC <- count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var)/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
 
-count.excess2$exces_ci_lcl_INC <- count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var)/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
 
 count.excess2$exces_pi_INC <- count.excess2$excess_pi/count.excess2$census_bureau_pop_2019*1000000
 
 count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
 count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), ' (',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
 
-#sort by count
-count.excess2 <- count.excess2[rev(order(count.excess2$excess_pi)),]
+#sort by incidence
+count.excess2 <- count.excess2[rev(order(count.excess2$exces_pi_INC)),]
 
 
 count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
@@ -576,7 +624,7 @@ last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
 
-htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from January 5, 2020 through ', last.date.format))
+htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
 ```
 
 
@@ -602,12 +650,18 @@ min<-sapply(ili.data.spl, function(x)  min(x$total_patients))
 state.select<-names(min)[which(min>0) ]
 ili.data <- ili.data[ili.data$state %in% state.select,]
 ## Run the main analysis function, adjusting for flu using NREVSS data
+
+ili.data2 <- merge(ili.data, hhs_states.cw, by='state')
+ili.data2.agg <- aggregate(ili.data2[,c('ilitotal','total_patients')], by=list('state'=ili.data2$state_region,"week_start"=ili.data2$week_start), FUN=sum)
+
+ili.data2.agg <- merge(ili.data2.agg, clin4.lags, by.x=c('state','week_start'), by.y=c('state', 'wk_date'))
+
 excess_cases1 <-
-  excessCases(ds = ili.data,
+  excessCases(ds = ili.data2.agg,
               datevar       = "week_start", 
               statevar      = "state",
               denom.var     = "total_patients",
-              adj.flu       = "auto",
+              adj.flu       = "flu_pct_adj",
               use.syndromes = c("ilitotal"),
               extrapolation.date = "2020-03-01",
               time.res='week')
@@ -629,32 +683,55 @@ mmwr.epiwk.ili[date.mmwrdates.ili$mmwr_week>=27]<-date.mmwrdates.ili$mmwr_week[d
 mmwr.epiwk.ili <- mmwr.epiwk.ili +26
 ```
 
-```{r, fig.width=8, fig.height=7}
-common.states <- intersect(colnames(rr2), colnames(rr2.ili))
-rr2.comp <- rr2[,common.states]
-rr2.ili.comp <- rr2.ili[,common.states] 
-  par(mfrow=c(4,4))
+```{r, fig.width=7.3, fig.height=7}
+common.states <- intersect(colnames(rr2), colnames(rr2.ili) )
 
-for(i in 1:length(common.states)){
+states.cdc.order <- c(common.states[common.states %in% state.abb],
+                      common.states[!(common.states %in% state.abb)]) 
+plot.state.indices <- match( states.cdc.order,common.states  )
+
+rr2.comp <- rr2[,states.cdc.order]
+rr2.ili.comp <- rr2.ili[,states.cdc.order] 
+date.start <-unique(pi.data$week_start[pi.data$weeknumber==27 & year(pi.data$week_start)==2019])
+dates.plot4 <- seq.Date(from=date.start, length.out=52, by='week')
+
+  par(mfrow=c(5,3), mar=c(2,4,2,2))
+
+for(i in 1:ncol(rr2.comp)){
     y.range1<-c(0,2)
     ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2.comp[,i])
     ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
+    
+    if(states.cdc.order[i] %in% state.abb ){
+      state.name.plot <-    
+      state.name[match(states.cdc.order[i],state.abb)]
+    }else{
+    state.name.plot <- states.cdc.order[i]
+    }
+    
     cols1<-c(rep('grey',(ncol(ds2.c)-2) ),'red')
-    plot(ds2.c$epiwk         ,
+    plot(dates.plot4         ,
        exp(ds2.c[,'2019']),
        type='l',
-       col='red',
+       col='#e41a1c',
        ylim=y.range1,
+       xlim=c(as.Date(c('2019-07-01')),max(pi.data$week_end)),
        bty='l',
        lty=1,
-       ylab='Observed/Expected',
-       main=paste(common.states[i], ' Deaths(red),','ILI(blue)' ))
+       xlab='',
+       xaxt='n',
+       ylab='Observed/Expected'
+       #main=common.states[i]
+       )
+    axis(1, at=as.Date(c('2019-07-01', '2019-10-01','2020-01-01', '2020-04-01', '2020-07-01')) , labels= c('Jul','Oct','Jan','Apr','Jul')  )
 
   es2<-cbind.data.frame('epiwk'=mmwr.epiwk.ili,'epiyr'=mmwr.epiyr.ili, rr=rr2.ili.comp[,i])
     es2.c<-dcast(es2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
-     points(es2.c$epiwk         ,
-       exp(es2.c[,'2019']), type='l', col='blue')
-    abline(h=1, col='black')
+     points(dates.plot4         ,
+       exp(es2.c[,'2019']), type='l', col='#377eb8')
+    abline(h=1, col='gray', lty=2)
+    
+    text(min(dates.plot4), y=0.2, state.name.plot,pos=4, cex=0.9)
 }
 
 ```
@@ -844,60 +921,5 @@ for(i in 1:length(states.cdc)){
 
 ```
 
-## Supp Figure; Fig 1 Observed vs Expected P&I deaths for *all* states
-```{r, fig.width=8, fig.height=7}
 
-  par(mfrow=c(4,4))
-
-for(i in 1:dim(pred)[2]){
-  for(j in 1:dim(pred)[3]){
-    y.range1<-range(c( pred[select.indices,i,j]/denom[select.indices,i,j],obs[select.indices,i,j]/denom[select.indices,i,j], upi[select.indices,i,j]/denom[select.indices,i,j],0))
-  plot(dates,
-       pred[select.indices,i,j]/denom[select.indices,i,j],
-       type='l',
-       col='red',
-       ylim=y.range1,
-       bty='l',
-       ylab='Proportion',
-       main=paste(states[i],ages[j]))
-
-  points(dates,
-         obs[select.indices,i,j]/denom[select.indices,i,j],
-         type='l',
-         col='black')
-
-  polygon(c(dates,
-            rev(dates)),
-          c(lpi[select.indices,i,j]/denom[select.indices,i,j],
-            rev(upi[select.indices,i,j]/denom[select.indices,i,j])),
-          col = rgb(1, 0, 0, alpha = 0.1),
-          border = NA)
-  }
-}
-```
-
-
-## Supp figure: Fig 2 for all states.
-```{r, fig.width=8, fig.height=7}
-
-  par(mfrow=c(4,4), mar=c(2,4,2,1))
-plot.state.indices <- which(dimnames(pred)[[2]] %in% states.cdc )
-
-for(i in plot.state.indices){
-    y.range1<-c(0,2)
-    ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2[,i])
-    ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
-    cols1<-c(rep('grey',(ncol(ds2.c)-2) ),'red')
-    matplot(ds2.c$epiwk         ,
-       exp(ds2.c[,-1]),
-       type='l',
-       col=cols1,
-       ylim=y.range1,
-       bty='l',
-       lty=1,
-       ylab='Observed/Expected',
-       main=paste(states[i]))
-    abline(h=1, col='black')
-    }
-```
 
