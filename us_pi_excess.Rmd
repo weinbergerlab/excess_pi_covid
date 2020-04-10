@@ -18,7 +18,8 @@ knitr::opts_chunk$set(
   warning=FALSE, 
   message=FALSE,
   comment = "#>",
-  dev=c('png','pdf')
+  dev=c('pdf', 'png'),
+  fig.path='./figures/'
 )
 ```
 
@@ -48,7 +49,7 @@ source('./functions/ts_plot_func.R')
 
 
 ```{r}
-plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','WA' )
+plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','WA' )
 ```
 
 
@@ -84,22 +85,30 @@ json_data <- fromJSON(file=url.test)
 test.dates <- as.character(sapply(json_data,'[[','date'))
 
 test.state <- sapply(json_data,'[[','state')
-testN <- sapply(json_data, '[[', 'totalTestResults')
-cum.death <- sapply(json_data, '[[', 'death')
-cum.death <-sapply(cum.death, function(x){ 
+testN <- sapply(json_data, '[[', 'totalTestResultsIncrease')
+testN <-sapply(testN, function(x){ 
   if(is.null(x)){
   x <-0
   }
   return(x)
   }
   )
-test.ds <- cbind.data.frame('state'=test.state,test.dates, 'cum.tests'=testN, 'cov.track.cum.death'=cum.death )
-test.ds$test.dates <-as.Date(test.ds$test.dates, '%Y%m%d')
-test.ds$dow <- weekdays(test.ds$test.dates)
+deathN <- sapply(json_data, '[[', 'deathIncrease')
+deathN <-sapply(deathN, function(x){ 
+  if(is.null(x)){
+  x <-0
+  }
+  return(x)
+  }
+  )
+test.ds <- cbind.data.frame('state'=test.state,test.dates, 'testN.day'=testN, 'deathN.day'=deathN )
+test.ds$test.date.wk <-floor_date(as.Date(test.ds$test.dates, '%Y%m%d'),'week')
 
-#Look at number of test at end of week..match this to the start date
-test.ds <- test.ds[test.ds$dow == 'Saturday' ,]
-test.ds$test.dates <- test.ds$test.dates - 6
+test.ds <- merge(test.ds, hhs_states.cw, by='state')
+
+
+test.ds.agg <- aggregate( test.ds[,c('testN.day','deathN.day')] , by=list('state'=test.ds$state_region,'date'=test.ds$test.date.wk), FUN=sum)
+names(test.ds.agg) <- c('state','date','testN','deathN')
 
 pop1<-read.csv('./Data/nst-est2019-01.csv')
 pop1$state_name <- substring(pop1$state_name,2)
@@ -111,32 +120,11 @@ pop1.reg <- merge(pop1, hhs_states.cw, by='state')
 pop2 <- aggregate(pop1.reg[,"census_bureau_pop_2019"], by=list('state'=pop1.reg$state_region), FUN=sum)
 names(pop2) <- c('state','census_bureau_pop_2019')
 
-test.ds2 <- merge(test.ds, pop1, by='state')
+test.ds2 <- merge(test.ds.agg, pop2, by='state')
+test.ds2$test.week.per.capita <- test.ds2$testN/test.ds2$census_bureau_pop_2019*1000
+names(test.ds2) <- c('state','date','testN','covid.track.death', 'pop2019',"test.week.per.capita")
 
-test.ds2 <- merge(test.ds2, hhs_states.cw, by='state')
-
-test.ds2 <- aggregate(test.ds2[,c('cum.tests','census_bureau_pop_2019','cov.track.cum.death')], by=list('state'=test.ds2[, 'state_region'], 'test.dates'=test.ds2$test.dates ), FUN=sum)
-
-test.ds2$cum.test.per.capita <- test.ds2$cum.tests/test.ds2$census_bureau_pop_2019*1000
-test.ds2 <- test.ds2[, c('state','cum.test.per.capita', 'test.dates','cov.track.cum.death')]
-
-test.ds2.spl <- split( test.ds2, test.ds2$state)
-test.ds2.spl <- lapply(test.ds2.spl, function(x){
-  if(nrow(x)>0){
-  x<-x[order(x$test.dates),]
-  x$test.week.per.capita <- x$cum.test.per.capita
-  x$covid.track.death    <- x$cov.track.cum.death
-  
-  for(i in 2: nrow(x)){
-    x$test.week.per.capita[i] <- x$cum.test.per.capita[i] - x$cum.test.per.capita[i-1]
-    
-    x$covid.track.death[i] <- x$cov.track.cum.death[i] - x$cov.track.cum.death[i-1]
-  }
-  }
-  return(x)
-}
-  )
-test.ds3.spl <-do.call('rbind.data.frame', test.ds2.spl)
+test.ds3.spl <- test.ds2
 ```
 
 ```{r}
@@ -146,9 +134,9 @@ nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
   clin <- nrevvs.state[["clinical_labs"]]
   clin$state <- state.abb[match(clin$region, state.name)]
   
-  #data(cdcfluview::hhs_regions)
+  data(cdcfluview::hhs_regions)
   
-  #cw.file <- cdcfluview::hhs_regions
+  cw.file <- cdcfluview::hhs_regions
   
   clin2 <- merge(clin, hhs_states.cw,
                  by = "state")
@@ -243,11 +231,11 @@ pi.data <- merge(pi.data,hhs_states.cw, by='state', all=T)
 pi.data$state_region[pi.data$state=='NYC'] <- 'NYC'
 pi.data$pct.comp.wgt <- pi.data$percent_complete*pi.data$all_deaths
 
-pi.data.agg <- aggregate(pi.data[,c('total_pni','all_deaths','pct.comp.wgt')], by=list('state'=pi.data$state_region, 'week_start'=pi.data$week_start, 'week_end'=pi.data$week_end), FUN=sum)
+pi.data.agg <- aggregate(pi.data[,c('total_pni','all_deaths','pct.comp.wgt')], by=list('state'=pi.data$state_region, 'week_start'=pi.data$week_start, 'week_end'=pi.data$week_end), FUN=sum, na.rm=T)
 pi.data.agg$percent_complete <- pi.data.agg$pct.comp.wgt/pi.data.agg$all_deaths
 
 spl1<-split(pi.data.agg, pi.data.agg$state)
-min.state <- lapply(spl1, function(x){ x$miss.x<-min(x$total_pni)
+min.state <- lapply(spl1, function(x){ x$miss.x<-min(x$total_pni, na.rm=T)
 return(x)
                 })
 pi.data.clean <- do.call('rbind.data.frame',min.state)
@@ -257,6 +245,8 @@ pi.data.clean2<- merge( pi.data.clean,clin4.lags, by.x=c('week_start', 'state'),
 
 pi.data.clean2<- pi.data.clean2[order(pi.data.clean2$state, pi.data.clean2$week_start),]
 states.cdc <- unique(pi.data.clean2$state)
+
+date.print <- max(pi.data.clean2$week_end)
 
 ```
 
@@ -271,11 +261,10 @@ matplot(cor.lags['percent_pni',-1,], type='l')
 #Is lag of 0,1,or 2 the best?...shows 1 weeks lag best in 20 states,  2 week lag best in 3 states
 table(apply(cor.lags['percent_pni',-1,],2, function(x) which(max(x)==x)))
 
-
 ```
 
 ## Abstract
-Mortality data on deaths due to pneumonia&influenza through the week ending `r  max(dates1)+7`
+Mortality data on deaths due to pneumonia & influenza through the week ending `r  date.print`
 
 *Background*
 Tracking the severity and public health impact of emerging diseases, such as the novel coronavirus diseases COVID-19, is a critical need. These efforts are often hampered by testing issues and reporting lags for key epidemiological data. Evaluating unexplained increases in deaths attributed to non-specific causes, such as pneumonia, can provide a more complete picture of the burden caused by COVID-19. 
@@ -376,7 +365,7 @@ excess_deaths_var <- excessExtract(ds = ds,
 ## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
  The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+7`.
 
-```{r fig1}
+```{r }
 n.days <- 52
 select.indices <- (length(dates1)-n.days):length(dates1)
 dates<-dates1[select.indices]
@@ -384,9 +373,9 @@ states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
 ```
 
-```{r, fig.width=7.3, fig.height=5.5}
+```{r fig1, fig.width=7.3, fig.height=6.9}
 
-  par(mfrow=c(4,4), mar=c(2,4,2,1))
+  par(mfrow=c(5,4), mar=c(2,4,2,1))
 states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
                       states.cdc[!(states.cdc %in% state.abb)]) 
 plot.state.indices <- match( states.cdc.order,dimnames(pred)[[2]]  )
@@ -444,9 +433,9 @@ check<-cbind.data.frame(date.mmwrdates,mmwr.epiwk, mmwr.epiyr)
 
 These plots show the Observed/Expected number of deaths due to pneumonia and influenza in each week for the 2019-20 year (red) compared to previous years (gray). Values close to 1 indicate that the values for that week are close to what would be expected based on the time of year and influenza activity.
 
-```{r fig2, fig.width=7.3, fig.height=5.5}
+```{r fig2, fig.width=7.3, fig.height=6.9}
 
-  par(mfrow=c(4,4), mar=c(2,4,2,1))
+  par(mfrow=c(5,4), mar=c(2,4,2,1))
 states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
                       states.cdc[!(states.cdc %in% state.abb)]) 
 plot.state.indices <- match( states.cdc.order,dimnames(pred)[[2]]  )
@@ -560,7 +549,7 @@ jh3 <- merge( jh3, pi.data.clean2[c('state', "week_start",'percent_complete')], 
 jh3 <- jh3[jh3$date >= as.Date('2020-02-09'),] #2 weeks before 1st reported deaths by CDC
 jh3$deaths[is.na(jh3$deaths)] <- 0
 
-jh3 <- merge(jh3, test.ds3.spl, by.x=c('state','date'), by.y=c('state','test.dates'), all=T)
+jh3 <- merge(jh3, test.ds3.spl, by=c('state','date'), all=T)
 jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
 
 jh3 <- jh3[ !is.na(jh3$deaths), ]
@@ -571,10 +560,10 @@ jh3 <- jh3[jh3$state %in% states.cdc,]
 #jh3 <-jh3[!is.na(jh3$excess_pi ),]
 ```
 
-```{r fig3, fig.width=7.3, fig.height=5.5}
+```{r fig3, fig.width=7.3, fig.height=6.9}
 ## uses covidtracking.com data for reported deaths
 
-par(mfrow=c(4,4), mar=c(2,2,1,3))
+par(mfrow=c(5,4), mar=c(2,3,1,3))
 ts.plot.func(ds.plot=jh3, death.var='covid.track.death' ,states.plot=unique(jh3$state) )
 
 
@@ -589,28 +578,28 @@ count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complet
 
 count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
 
-count.excess2 <- aggregate(count.excess[,c('excess_pi','total_pi','covid.track.death','excess_pi_var')], by=list('state'=count.excess$state) ,FUN=sum)
+count.excess2 <- aggregate(count.excess[,c('excess_pi_adj','total_pi_adj','covid.track.death','excess_pi_var')], by=list('state'=count.excess$state) ,FUN=sum)
 
 count.excess2 <- merge(count.excess2, pop2, by='state')
 
-count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))
+count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var))
 
-count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))
+count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var))
 
-count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
 
-count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
 
-count.excess2$exces_pi_INC <- count.excess2$excess_pi/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_pi_INC <- count.excess2$excess_pi_adj/count.excess2$census_bureau_pop_2019*1000000
 
-count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
+count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi_adj), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
 count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), ' (',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
 
 #sort by incidence
 count.excess2 <- count.excess2[rev(order(count.excess2$exces_pi_INC)),]
 
-
-count.excess3 <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
+count.excess2$total_pi_adj <- round(count.excess2$total_pi_adj)
+count.excess3 <- count.excess2[, c('state','total_pi_adj','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
 names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Reported COVID-19 deaths','Excess P&I deaths/1,000,000 people')
 last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
@@ -676,7 +665,7 @@ mmwr.epiwk.ili[date.mmwrdates.ili$mmwr_week>=27]<-date.mmwrdates.ili$mmwr_week[d
 mmwr.epiwk.ili <- mmwr.epiwk.ili +26
 ```
 
-```{r, fig.width=7.3, fig.height=7}
+```{r fig4, fig.width=7.3, fig.height=8}
 common.states <- intersect(colnames(rr2), colnames(rr2.ili) )
 
 states.cdc.order <- c(common.states[common.states %in% state.abb],
@@ -688,10 +677,10 @@ rr2.ili.comp <- rr2.ili[,states.cdc.order]
 date.start <-unique(pi.data$week_start[pi.data$weeknumber==27 & year(pi.data$week_start)==2019])
 dates.plot4 <- seq.Date(from=date.start, length.out=52, by='week')
 
-  par(mfrow=c(5,3), mar=c(2,4,2,2))
+  par(mfrow=c(5,4), mar=c(2,4,2,2))
 
 for(i in 1:ncol(rr2.comp)){
-    y.range1<-c(0,2)
+    y.range1<-c(0,5)
     ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2.comp[,i])
     ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
     
@@ -728,16 +717,11 @@ for(i in 1:ncol(rr2.comp)){
 }
 
 ```
-## DISCUSSION
-Monitoring trends in non-specific causes of death, like P&I, provides a window into the true burden of COVID-19. Given the lack of adequate testing and geographical variability in testing, this type of monitoring provides key information on the severity of the epidemic in different geographic regions. This also provides some indication of the degree to which viral testing is missing deaths due to COVID-19. Our findings suggest that the degree to which deaths due to COVID-19 are being correctly attributed to the virus varies by state. Some states, such as Washington, attributed most of their excess P&I deaths to COVID. In contrast, other states, such as Florida and XX, might have missed deaths early on and might be undercounting deaths by a substantial degree currently. 
-	Non-specific syndromic endpoints, such as deaths due to P&I, outpatient visits for influenza-like illness, and emergency department visits for fever, can provide a crude but informative measure of the progression of the outbreak. These measures themselves can be biased by changes in how diseases or deaths are recorded. However, in the absence of widespread and systematic testing, they provide a useful measure of epidemic progression and could be informative in tracking how interventions like social distancing influence the course of the epidemic.
-	The present COVID-19 pandemic is different from the last four influenza A pandemics, in that the mean age at death is about 80 years.  In this sense, the COVID pandemic is  more like seasonal influenza where most deaths are among elderly, but contrast with the age profile of the 2009 influenza pandemic where the mean age was 37yrs..  Because of this it makes sense to look at complex metrics in addition to estimating the number of excess deaths.  For example, years of life lost. See here https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2843747/
- 	It is estimated that the epidemic in the US lags that in Europe by 1-2 weeks. Several European countries have experienced high death toll, particularly Italy and Spain. Consolidated excess mortality estimates are not yet available although real-time total mortality data from the EuroMomo project offers a glimpse of the total burden of the epidemic…. We see….
- 	
+
 ## Supplementary figure: Excess all-cause deaths
 
 Now instead of modeling the proportion of deaths that were due to pneumonia and influenza, we will model all-caused deaths
-```{r}
+```{r fig.s1}
 #Run analysis
 pi.data.clean2$one <- 1
 pi.data.clean2$percent_complete.adj <-pi.data.clean2$percent_complete - 0.5
@@ -813,7 +797,7 @@ dates.select <- which(dates1 >= as.Date('2020-01-01'))
 
 The black line shows the observed number of *all* deaths per week, regardless of cause. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+7`. Note that these are **adjusted** for percent completeness of the data. There are no obvious jumps in all-cause mortality, even in Washington State
 
-```{r, fig.width=8, fig.height=7}
+```{r fig.s2, fig.width=8, fig.height=7}
 
   par(mfrow=c(4,4))
 
@@ -847,7 +831,7 @@ for(i in 1:dim(pred.ac)[2]){
 ## Supp Figure: Extract official data directly from FL 
 This shows that the Johns Hopkins data  are off by ~ 1 week in the date assignments compared to Florida official stats. The Florida data records the 'date case counted', so it is possible this date is not date of death but rather the date when the case was recognized.
 
-```{r}
+```{r fig.s3}
 library(pdftools)
 library(readr)
 library(gsubfn)
@@ -870,11 +854,16 @@ fl5 <-fl5[fl5$state=='FL',]
 fl5 <-fl5[!is.na(fl5$state),]
 
 par(mfrow=c(1,1))
-states.cdc <-'FL'
+states.cdc.fl <-'FL'
 y2.range.test <- range(fl5$test.week.per.capita, na.rm=T)
-for(i in 1:length(states.cdc)){
-    ds.select <- fl5[fl5$state==states.cdc[i],]
-    y.range1<-range(c(ds.select$covid.track.death, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
+for(i in 1:length(states.cdc.fl)){
+    ds.select <- fl5[fl5$state==states.cdc.fl[i],]
+   # y.range1<-range(c(ds.select$covid.track.death, ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
+    
+     ave_pi <- mean(ds.select$total_pi, na.rm=T)
+  ave.range <- c(-ave_pi*0.3, ave_pi*0.7)
+  y.range1<-range(c(ds.select[,death.var], ds.select$excess_pi/ds.select$percent_complete), na.rm=T)
+ 
     ds.select$death.early <- ds.select$covid.track.death
     ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
     par(new=FALSE)
@@ -882,12 +871,12 @@ for(i in 1:length(states.cdc)){
        ds.select$covid.track.death,
        type='l',
        col='red',
-       ylim=c(0,max(y.range1)),
+       ylim=y.range1,
        bty='l',
        lty=3,
        ylab='N Deaths',
        xlab='Date',
-       main=paste(states.cdc[i] ))
+       main=paste(states.cdc.fl[i] ))
     
        points(ds.select$date         ,
        ds.select$death.early, type='l', col='red',
@@ -914,5 +903,216 @@ for(i in 1:length(states.cdc)){
 
 ```
 
+##Sensitivity analysis 1: Do not adjust for underreporting of deaths
+
+```{r, tables1}
+count.excess <-jh3[jh3$date >= as.Date('2020-02-09') & jh3$date <=max(pi.data$week_end) ,]
+
+count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
+
+count.excess2 <- aggregate(count.excess[,c('excess_pi','excess_pi_adj','covid.track.death','excess_pi_var')], by=list('state'=count.excess$state) ,FUN=sum)
+
+count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))
+
+count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))
+
+count.excess2$exces_ci_ucl_adj <- round(count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var))
+
+count.excess2$exces_ci_lcl_adj <- round(count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var))
+
+
+count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
+
+count.excess2$excess_pi_ci_adj <- paste0(round(count.excess2$excess_pi_adj ), '(',  count.excess2$exces_ci_lcl_adj , ', ', count.excess2$exces_ci_ucl_adj ,')'  ) 
+
+count.excess3 <- count.excess2[, c('state','excess_pi_ci', 'excess_pi_ci_adj', 'covid.track.death')]
+names(count.excess3) <-c('State', 'Excess P&I deaths (unadjusted)','Excess P&I deaths (adjusted)', 'Reported COVID-19 deaths')
+last.date.format<-max(pi.data$week_end)
+last.date.format<-format(last.date.format,
+                         "%b %d, %Y")
+
+htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+```
+```
+
+## Sensitivity analysis 2: do not adjust for flu
+```{r, include=F}
+#Run analysis
+excess_deaths1.unadjusted <-
+  excessCases(ds = pi.data.clean2,
+              datevar       = "week_start",
+              statevar      = "state",
+              denom.var     = "all_deaths",
+              adj.flu       = "none",
+              use.syndromes = c("total_pni"),
+              extrapolation.date = "2020-03-01",
+              time.res='week')
+
+syndrome.select <- 'total_pni' #which syndrome do you want to plot?
+n.days<-52  #How many days to plot?
+ds <- excess_deaths1.unadjusted
+```
+ 
+```{r}
+#Extract the data needed to plot from the results
+
+dates1 <-
+  ds[[1]][[1]][[1]]$date
+  
+unexplained.cases <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "unexplained.cases")
+
+unexplained.log.rr <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "resid1")
+
+denom <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "denom")
+
+
+upi <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "upi")
+
+lpi <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "lpi")
+
+obs <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "y")
+
+pred<-  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "pred")
+
+rr <-  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "resid1")
+
+excess_deaths <- excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "unexplained.cases")
+
+excess_deaths_var <- excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "pred.var")
+```
+
+```{r}
+jh1.m <- melt(jh1[, c(6:7,13:ncol(jh1))], id.vars=c('Admin2',"Province_State"))
+jh1.m$variable <-as.Date(jh1.m$variable, '%m/%d/%y')
+
+#Aggregate across the admin2 regions by day
+jh2 <- aggregate( jh1.m$value, by=list('date'=jh1.m$variable, 'state'=jh1.m$Province_State), FUN=sum, na.rm=T)
+names(jh2) <- c('date','state', 'cum.deaths')
+
+jh2.spl <- split(jh2, jh2$state)
+jh2.spl <-lapply(jh2.spl, function(x){
+  x$deaths<-x$cum.deaths
+  for(i in 2:nrow(x)){
+    x$deaths[i] <- x$cum.deaths[i] - x$cum.deaths[(i-1)]
+  }
+  return(x)
+})
+jh2 <- do.call('rbind.data.frame', jh2.spl)
+jh2$state <- state.abb[match(jh2$state, state.name)]
+
+#round date to sunday
+jh2$date <-floor_date(jh2$date, 'week')
+
+jh2 <- merge(jh2, hhs_states.cw, by='state')
+
+jh2.agg<- aggregate( jh2$deaths, by=list('state'=jh2$state_region, 'date'=jh2$date), FUN=sum)
+names(jh2.agg) <- c('state', 'date', 'deaths')
+
+excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
+excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
+names(excess_deaths.m) <-c('date','state','excess_pi')
+
+#excess_deaths_var
+excess_deaths.var.df <- cbind.data.frame('date'=dates1,excess_deaths_var[,,1])
+excess_deaths.var.m <- melt(excess_deaths.var.df, id.vars =c('date'))
+names(excess_deaths.var.m) <-c('date','state','excess_pi_var')
+
+excess_deaths.upi.df <- cbind.data.frame('date'=dates1,  (obs[,,1]-lpi[,,1] ))
+excess_deaths.upi.m <- melt(excess_deaths.upi.df, id.vars =c('date'))
+names(excess_deaths.upi.m) <-c('date','state','excess_deaths.upi')
+
+excess_deaths.lpi.df <- cbind.data.frame('date'=dates1,(obs[,,1]-upi[,,1]) )
+excess_deaths.lpi.m <- melt(excess_deaths.lpi.df, id.vars =c('date'))
+names(excess_deaths.lpi.m) <-c('date','state','excess_deaths.lpi')
+
+total_pi_df <- cbind.data.frame('date'=dates1,(obs[,,1]) )
+total_pi_df.m <- melt(total_pi_df, id.vars =c('date'))
+names(total_pi_df.m) <-c('date','state','total_pi')
+
+#states.cdc <- unique(excess_deaths.m$state)
+jh3 <- merge(jh2.agg, excess_deaths.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, excess_deaths.lpi.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, excess_deaths.upi.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, total_pi_df.m, by=c('state','date') , all=T)
+jh3 <- merge(jh3, excess_deaths.var.m, by=c('state','date') , all=T)
+
+#jh3 <-jh3[jh3$state %in% states.cdc,]
+
+
+jh3 <- merge( jh3, pi.data.clean2[c('state', "week_start",'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
+
+jh3 <- jh3[jh3$date >= as.Date('2020-02-09'),] #2 weeks before 1st reported deaths by CDC
+jh3$deaths[is.na(jh3$deaths)] <- 0
+
+jh3 <- merge(jh3, test.ds3.spl, by=c('state','date'), all=T)
+jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
+
+jh3 <- jh3[ !is.na(jh3$deaths), ]
+
+#Only plot out to 1 week ahead of the US P&I data
+jh3 <- jh3[ jh3$date <= max(pi.data$"week_start" +7),]
+jh3 <- jh3[jh3$state %in% states.cdc,]
+#jh3 <-jh3[!is.na(jh3$excess_pi ),]
+count.excess <-jh3[jh3$date >= as.Date('2020-02-09') & jh3$date <=max(pi.data$week_end) ,]
+
+count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
+
+count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
+
+count.excess2 <- aggregate(count.excess[,c('excess_pi','total_pi','covid.track.death','excess_pi_var')], by=list('state'=count.excess$state) ,FUN=sum)
+
+count.excess2 <- merge(count.excess2, pop2, by='state')
+
+count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))
+
+count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))
+
+count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi + 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi - 1.96*sqrt(count.excess2$excess_pi_var))/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$exces_pi_INC <- count.excess2$excess_pi/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
+count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), ' (',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
+
+#sort by incidence
+count.excess2 <- count.excess2[rev(order(count.excess2$exces_pi_INC)),]
+
+count.excess3.unadjusted <- count.excess2[, c('state','total_pi','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
+names(count.excess3.unadjusted) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Reported COVID-19 deaths','Excess P&I deaths/1,000,000 people')
+last.date.format<-max(pi.data$week_end)
+last.date.format<-format(last.date.format,
+                         "%b %d, %Y")
+compare.excess <- merge(count.excess3.unadjusted[,c('State',"Excess P&I deaths")], count.excess3[,c('State',"Excess P&I deaths")], by='State')
+
+htmlTable(count.excess3.unadjusted, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format, ' without influenza adjustment in baseline'), rnames=F)
+```
 
 
