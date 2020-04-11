@@ -2,16 +2,25 @@ ts.plot.func <-function(ds.plot=jh3,ylim.adj=0.7, death.var='deaths' ,states.plo
   
   max.test.all.state<-max(ds.plot$test.week.per.capita, na.rm=T)
  
-  states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
-                        states.cdc[!(states.cdc %in% state.abb)]) 
-  plot.state.indices <- match( states.cdc.order,unique(ds.plot$state)  )
+ # states.cdc.order <- c(states.cdc[states.cdc %in% state.abb],
+ #                       states.cdc[!(states.cdc %in% state.abb)]) 
+  #plot.state.indices <- match( states.cdc.order,unique(ds.plot$state)  )
+  
+  plot.state.rank <- cbind.data.frame(state.index=1:dim(rr)[2],state.rank= rank(-rr[dim(rr)[1],,1]))
+  plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
+  plot.state.indices <- plot.state.rank$state.index
   
 for(i in plot.state.indices){
   ds.select <- ds.plot[ds.plot$state==states.cdc[i],]
   max.test.this.state <- max(ds.select$test.week.per.capita, na.rm=T)
   ave_pi <- mean(ds.select$total_pi, na.rm=T)
-  ave.range <- c(-ave_pi*0.2, ave_pi*ylim.adj)
   y.range1<-range(c(ds.select[,death.var], (ds.select$excess_pi/ds.select$percent_complete)), na.rm=T)
+  
+  #Makes all have same relative range
+  #ave.range <- c(-ave_pi*0.2, ave_pi*ylim.adj)
+  
+  ave.range <-y.range1 
+  
   ds.select$death.early <- ds.select[,death.var]
   ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
   par(new=FALSE)
@@ -54,8 +63,11 @@ for(i in plot.state.indices){
           col = rgb(1, 0,0, alpha = 0.05), 
           border = NA)
   
+  #Scales axis 2
   scale.factor.test <- ave.range[2]/max.test.all.state
-  points(ds.select$date+6, scale.factor.test*ds.select$test.week.per.capita, type='l', lty=3, lwd=1, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
+  #scale.factor.test <-1
+  
+  points(ds.select$date+6, scale.factor.test*ds.select$test.week.per.capita, type='l', lty=2, lwd=2, col='gray', yaxt='n',xaxt='n', ylab='', xlab='')
   
   axis(side=4,at=(c(0,2,4,6)*(scale.factor.test)) , labels=c(0,2,4,6), col.ticks='gray', col='gray', col.lab='gray' ,col.axis='gray')
   mtext("", side=4, line=2, col='gray', cex=0.75)
