@@ -12,6 +12,8 @@ output:
   word_document:
     toc: yes
     toc_depth: '2'
+params:
+  agg.level: 'state_region'
 ---
 
 ```{r, include = F}
@@ -60,8 +62,28 @@ plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','WA' )
 
 
 ```{r}
-#Date whn start counting excess deaths: 2 weeks prior to first reported COVID-19 death
+#Date when start counting excess deaths: 2 weeks prior to first reported COVID-19 death
 count.start.date <- as.Date('2020-02-09')
+```
+
+
+```{r}
+#Import the P&I data
+## Download the mortality data
+#pi.data.alt <- read.socrata("https://data.cdc.gov/resource/pp7x-dyj2.json") #only through end of 2019
+#pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
+pi.data <- pi_mortality(coverage_area='state')
+
+pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) &pi.data$geo_description=='State',]
+
+pi.data.miss.states <- unique(pi.data.last$region_name[is.na(pi.data.last$total_pni)])
+
+pi.data.not.miss.states <- unique(pi.data.last$region_name[!is.na(pi.data.last$total_pni)])
+
+pi.data.not.miss.states <- state.abb[match(pi.data.not.miss.states, state.name)]
+
+pi.data.not.miss.states <-
+  pi.data.not.miss.states[!is.na(pi.data.not.miss.states)]
 ```
 
 ```{r}
@@ -75,7 +97,17 @@ hhs_states <- hhs_states[,c('state','state_region')]
 hhs_states$state_region <- gsub(' ','', hhs_states$state_region)
 hhs_states.cw <- hhs_states[!is.na(hhs_states$state),]
 
-hhs_states.cw.spl <- split(hhs_states.cw, hhs_states.cw$state_region)
+#Get rid of states that have no data in recent time points
+hhs_states.cw <- 
+  hhs_states.cw[ hhs_states.cw$state %in% pi.data.not.miss.states,]
+
+if(params$agg.level== 'state_region'){
+hhs_states.cw.spl <- split(hhs_states.cw, 
+                            hhs_states.cw$state_region)
+}else{
+  hhs_states.cw.spl <- split(hhs_states.cw, 
+                            hhs_states.cw$state)
+}
 
 hhs_states.cw.spl <-lapply(hhs_states.cw.spl, function(x) {
   x$state_region.lab <- paste(x$state, collapse=',')
@@ -84,7 +116,10 @@ hhs_states.cw.spl <-lapply(hhs_states.cw.spl, function(x) {
 )
 
 hhs_states.cw <-do.call('rbind.data.frame',hhs_states.cw.spl)
-hhs_states.cw$state_region[hhs_states.cw$state_region != hhs_states.cw$state] <- hhs_states.cw$state_region.lab[hhs_states.cw$state_region != hhs_states.cw$state]
+hhs_states.cw$state_region[hhs_states.cw$state_region != hhs_states.cw$state] <-
+  hhs_states.cw$state_region.lab[hhs_states.cw$state_region != hhs_states.cw$state]
+
+
 ```
 
 ```{r}
@@ -253,10 +288,6 @@ clin4.lags <- merge(clin4.lags, clin4.lag2, by=c('state','wk_date'))
 ```{r, include=F}
 #Format and fill mssings with 0s
 
-## Download the mortality data
-#pi.data.alt <- read.socrata("https://data.cdc.gov/resource/pp7x-dyj2.json")
-#pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
-pi.data <- pi_mortality(coverage_area='state')
 pi.data$percent_complete[pi.data$percent_complete > 1] <- 1
 
 pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
@@ -270,6 +301,7 @@ pi.data.ny.separate <- pi.data
 
 #Combine NYC and NY state
 pi.data$state_region[pi.data$state=='NYC'] <- 'NY'
+
 
 pi.data.agg <- aggregate(pi.data[,c('total_pni','all_deaths','pct.comp.wgt')], by=list('state'=pi.data$state_region, 'week_start'=pi.data$week_start, 'week_end'=pi.data$week_end), FUN=sum, na.rm=T)
 pi.data.agg$percent_complete <- pi.data.agg$pct.comp.wgt/pi.data.agg$all_deaths
@@ -333,9 +365,7 @@ excess_deaths1.adjusted <-
 syndrome.select <- 'total_pni' #which syndrome do you want to plot?
 n.days<-52  #How many days to plot?
 ds <- excess_deaths1.adjusted
-```
- 
-```{r}
+
 #Extract the data needed to plot from the results
 
 dates1 <-
@@ -387,18 +417,18 @@ excess_deaths <- excessExtract(ds = ds,
 excess_deaths_var <- excessExtract(ds = ds,
                 syndrome = syndrome.select,
                 extract.quantity = "pred.var")
-```
 
-## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
- The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
-
-```{r }
 n.days <- 52
 select.indices <- (length(dates1)-n.days):length(dates1)
 dates<-dates1[select.indices]
 states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
 ```
+
+## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
+ The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
+
+
 
 ```{r fig1, fig.width=7.3, fig.height=6.9}
 
