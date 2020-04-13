@@ -55,6 +55,38 @@ library(gsubfn)
 source('./functions/ts_plot_func.R')
 ```
 
+```{r}
+# Using ExcessILI's data archiving functions, returns the most recent copy of
+# output obtained by running a function or formula \code{f}, unless this 
+# copy doesn't exist or is older (by modification time) than \code{maxage}.
+# In that case, \code{f} is run and the output is archived into the folder
+# Data/'storeName' as an RDS file, using the function ExcessILI::storeRDS.
+#
+# @param storeName A string. The name of the folder to store output in
+# @param f A function or formula taking no arguments. Formulas are coerced to
+#   functions.
+# @param maxage How old can any existing archived file be before \code{f} is 
+#   called again?
+runIfExpired <- function(storeName, f, maxage=hours(24)) {
+  basepath <- "Data/"
+  mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
+  f <- rlang::as_function(f)
+  
+  runAndArchive <- function() {
+    data <- f()
+    storeRDS(data, storeName, basepath)
+    data
+  }
+    
+  if (is.na(mostRecent)) 
+    return(runAndArchive())
+
+  if (mostRecent %--% now() < maxage)
+    return(retrieveRDS(storeName, basepath))
+
+  runAndArchive()
+}
+```
 
 ```{r}
 plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','WA' )
@@ -74,7 +106,7 @@ count.start.date <- as.Date('2020-02-09')
 #pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
 
 #ARCHIVE
-pi.data <- pi_mortality(coverage_area='state')
+pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
 
 pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) &pi.data$geo_description=='State',]
 
@@ -131,7 +163,7 @@ url.test<-"https://covidtracking.com/api/v1/states/daily.json"
 
 
 #ARCHIVE
-json_data <- fromJSON(file=url.test)
+json_data <- runIfExpired('covidtracking_states_daily', ~fromJSON(file=url.test))
 test.dates <- as.character(sapply(json_data,'[[','date'))
 
 test.state <- sapply(json_data,'[[','state')
@@ -182,7 +214,7 @@ test.ds3.spl <- test.ds2
 url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json" 
 
 #ARCHIVE
-cdc.data <- fromJSON(file=url.cdc.covid, simplify=F)
+cdc.data <- runIfExpired('cdc_covid_data', ~fromJSON(file=url.cdc.covid, simplify=F))
 cdc.pneum.and.covid <- sapply(cdc.data,'[[', "pneumonia_and_covid_deaths"  )
 cdc.covid.death <- sapply(cdc.data,'[[', "covid_deaths"  )
 cdc.grp<-sapply(cdc.data,'[[', "group"  )
@@ -207,7 +239,7 @@ cdc.summary.state$covid.pct.pneum <- cdc.summary.state$`NCHS Reported COVID-19 D
 #download the NREVSS data
 
 #ARCHIVE
-nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
+nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c("state")))
   
   clin <- nrevvs.state[["clinical_labs"]]
   clin$state <- state.abb[match(clin$region, state.name)]
@@ -242,7 +274,7 @@ nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
   ##Florida doesn't have ILI data, so use regions ILI dat
   #
   #ARCHIVE
-  nrevvs_hhs <- cdcfluview::who_nrevss(region = c("hhs"))
+  nrevvs_hhs <- runIfExpired('nrevss_hhs', ~cdcfluview::who_nrevss(region = c("hhs")))
   
   clin.hhs <- nrevvs_hhs[["clinical_labs"]]
   clin.hhs.subsetvars <-
@@ -677,7 +709,7 @@ Here we compare the observed vs expected number of deaths due to pneumonia and i
 
 ```{r, include=F}
 #ARCHIVE
-ili.data <- ilinet(region = c("state"))
+ili.data <- runIfExpired('ilinet_state', ~ilinet(region = c("state")))
 ili.data$state <- state.abb[match(ili.data$region, state.name)]
 ili.data       <- ili.data[, c("state", "week_start", "ilitotal", "total_patients")]
 ili.data       <- ili.data[!is.na(ili.data$total_patients),]
