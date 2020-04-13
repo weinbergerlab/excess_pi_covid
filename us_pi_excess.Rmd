@@ -785,17 +785,25 @@ for(i in 1:length(ds)){
   aics[i]<-AIC(mod1)
   cp.date.index <- which(min(aics)==aics)
   }
-  return(cp.date.index)
+  best.aic<-min(aics)
+  w.aic<- exp(-0.5*(aics-best.aic))/sum(exp(-0.5*(aics-best.aic)))
+  results <- list('w.aics'=w.aic,'cp.date.index'=cp.date.index )
+  return(results)
 } 
 cp.ili <- apply(rr2.ili.comp[225:nrow(rr2.ili.comp),],2,cp.ds)
+cp.ili.waics <- round(sapply(cp.ili,'[[', 'w.aics'),2)
 cp.pi  <- apply(rr2.comp[225:nrow(rr2.comp),],2,cp.ds)
-plot(cp.ili, cp.pi)
+cp.pi.waics <- round(sapply(cp.pi,'[[', 'w.aics'),2)
+
+#NOTE:: INDEX FOR ILI AND INDEX FOR PI are different--more week for ILI..need to convert back to DATE
+#plot(cp.ili, cp.pi)
 
 ```
 
 
 
 ## Supplementary Table 1: Excess deaths by week across the US, compared with provisional death counts from NCHS
+Note excess P&I deaths and covidtracking.com numbers do not include Connecticut, North Carolina, and West Virginia  
 ```{r}
 count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <=max(pi.data$week_end) ,]
 
