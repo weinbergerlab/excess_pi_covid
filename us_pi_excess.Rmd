@@ -72,6 +72,8 @@ count.start.date <- as.Date('2020-02-09')
 ## Download the mortality data
 #pi.data.alt <- read.socrata("https://data.cdc.gov/resource/pp7x-dyj2.json") #only through end of 2019
 #pi.data.alt <- pi.data.alt[pi.data.alt$geoid=='state',]
+
+#ARCHIVE
 pi.data <- pi_mortality(coverage_area='state')
 
 pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) &pi.data$geo_description=='State',]
@@ -127,6 +129,8 @@ hhs_states.cw$state_region[hhs_states.cw$state_region != hhs_states.cw$state] <-
 url.test<-"https://covidtracking.com/api/v1/states/daily.json" 
 
 
+
+#ARCHIVE
 json_data <- fromJSON(file=url.test)
 test.dates <- as.character(sapply(json_data,'[[','date'))
 
@@ -176,6 +180,8 @@ test.ds3.spl <- test.ds2
 ```{r}
 #official CDC data
 url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json" 
+
+#ARCHIVE
 cdc.data <- fromJSON(file=url.cdc.covid, simplify=F)
 cdc.pneum.and.covid <- sapply(cdc.data,'[[', "pneumonia_and_covid_deaths"  )
 cdc.covid.death <- sapply(cdc.data,'[[', "covid_deaths"  )
@@ -199,6 +205,8 @@ cdc.summary.state$covid.pct.pneum <- cdc.summary.state$`NCHS Reported COVID-19 D
 
 ```{r}
 #download the NREVSS data
+
+#ARCHIVE
 nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
   
   clin <- nrevvs.state[["clinical_labs"]]
@@ -232,6 +240,8 @@ nrevvs.state <- cdcfluview::who_nrevss(region = c("state"))
   clin2 <- aggregate(clin2[, c('total_specimens','total_a','total_b')], by=list('state'=clin2$state_region, 'wk_date'=clin2$wk_date,'hhs_region'=clin2$hhs_region), FUN=sum, na.rm=T)
   
   ##Florida doesn't have ILI data, so use regions ILI dat
+  #
+  #ARCHIVE
   nrevvs_hhs <- cdcfluview::who_nrevss(region = c("hhs"))
   
   clin.hhs <- nrevvs_hhs[["clinical_labs"]]
@@ -666,6 +676,7 @@ htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneum
 Here we compare the observed vs expected number of deaths due to pneumonia and influenza in each week compare to the observed vs expected number of outpatient visits for influenza-like illness (ILI) in each week. we would expect ILI (blue line) to increase earlier than deaths (red line)
 
 ```{r, include=F}
+#ARCHIVE
 ili.data <- ilinet(region = c("state"))
 ili.data$state <- state.abb[match(ili.data$region, state.name)]
 ili.data       <- ili.data[, c("state", "week_start", "ilitotal", "total_patients")]
