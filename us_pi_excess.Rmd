@@ -763,12 +763,39 @@ for(i in plot.state.indices){
     abline(h=1, col='gray', lty=2)
     
     text(min(dates.plot4), y=0.2, state.name.plot,pos=4, cex=0.9, offset=0.1, xpd=NA)
+    
+ #   abline(v=as.Date(c('2020-03-07', '2020-03-21')), col=rgb(0,0,0,alpha=0.1))
 }
 
 ```
 
+```{r, eval=F}
 
-## Supplementary Table 1: Excess deaths by week across the US, compared with official numbers from NCHS
+#CHANGEPOINTS for excess ILI and excess P&I
+cp.ds <- function(ds){
+  spl<-matrix(NA, ncol=length(ds), nrow=length(ds))
+  #Create the splines
+for(i in 1:length(ds)){
+  spl[,i]<- (1:length(ds)) -i
+  spl[,i][spl[,i]<0]<-0
+}
+  aics<- rep(NA, ncol(spl))
+  for(i in 1:ncol(spl)){
+  mod1<- glm(ds ~ spl[,i] )
+  aics[i]<-AIC(mod1)
+  cp.date.index <- which(min(aics)==aics)
+  }
+  return(cp.date.index)
+} 
+cp.ili <- apply(rr2.ili.comp[225:nrow(rr2.ili.comp),],2,cp.ds)
+cp.pi  <- apply(rr2.comp[225:nrow(rr2.comp),],2,cp.ds)
+plot(cp.ili, cp.pi)
+
+```
+
+
+
+## Supplementary Table 1: Excess deaths by week across the US, compared with provisional death counts from NCHS
 ```{r}
 count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <=max(pi.data$week_end) ,]
 
