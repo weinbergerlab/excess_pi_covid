@@ -3,15 +3,15 @@ title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
 date: "4/3/2020"
 output:
-  word_document:
-    toc: yes
-    toc_depth: '2'
   html_document:
     df_print: paged
     html_document: null
     toc: yes
     toc_depth: 2
     toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '2'
 params:
   agg.level: 'state_region'
 ---
@@ -845,10 +845,10 @@ cp.pi.waics <- round(sapply(cp.pi,'[[', 'w.aics'),2)
 
 
 
-## Supplementary Table 1: Excess deaths by week across the US, compared with provisional death counts from NCHS
+## Table S1: Excess deaths by week across the US, compared with provisional death counts from NCHS
 Note excess P&I deaths and covidtracking.com numbers do not include Connecticut, North Carolina, and West Virginia  
 ```{r}
-count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <=max(pi.data$week_end) ,]
+count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <= max(pi.data$week_end) ,]
 
 count.excess$excess_pi_adj <- count.excess$excess_pi/count.excess$percent_complete
 
@@ -883,6 +883,25 @@ count.excess4 <- count.excess4[, c("Week ending","Total P&I deaths","Excess P&I 
 htmlTable(count.excess4, caption=paste0('Table S1: Comparison of data sources: Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
 ```
 
+```{r}
+#Aggregate across weeks
+count.excess.all <- apply(count.excess[,c('excess_pi_adj','total_pi_adj','covid.track.death','excess_pi_var_ADJ')] ,2,sum)
+count.excess.all <- as.data.frame(matrix(count.excess.all, nrow=1))
+names(count.excess.all) <- c('excess_pi_adj','total_pi_adj','covid.track.death','excess_pi_var_ADJ')
+
+count.excess.all$exces_ci_ucl <- round(count.excess.all$excess_pi_adj + 1.96*sqrt(count.excess.all$excess_pi_var_ADJ))
+
+count.excess.all$exces_ci_lcl <- round(count.excess.all$excess_pi_adj - 1.96*sqrt(count.excess.all$excess_pi_var_ADJ))
+
+
+count.excess.all$excess_pi_ci <- paste0(round(count.excess.all$excess_pi_adj), '(',  count.excess.all$exces_ci_lcl, ', ', count.excess.all$exces_ci_ucl,')'  ) 
+
+count.excess.all$excess_pi_ci
+
+count.excess.all$covid.track.death
+
+sum(as.numeric(as.character(count.excess4$`NCHS Reported COVID-19 Deaths`)))
+```
 
 
 ## Figure S1: Excess all-cause deaths
@@ -976,10 +995,10 @@ dates.select <- which(dates1 >= count.start.date)
 ```
 
 
-The black line shows the observed number of *all* deaths per week, regardless of cause. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+6`. Note that these are **adjusted** for percent completeness of the data. There are no obvious jumps in all-cause mortality, even in Washington State
+The black line shows the observed number of *all* deaths per week, regardless of cause. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+6`. Note that these are **adjusted** for percent completeness of the data. There are clear jumps in all-cause mortality in NY and NJ, other states less clear, probably due to reporting delays
 
 ```{r fig.s1, fig.width=8, fig.height=7}
-  par(mfrow=c(5,4))
+  par(mfrow=c(5,4), mar=c(3,4,1,1))
 
 plot.state.rank <- cbind.data.frame(state.index=1:dim(rr.ac)[2],state.rank= rank(-rr.ac[dim(rr.ac)[1],,1]))
 plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
@@ -998,7 +1017,8 @@ for(i in plot.state.indices){
        ylim=y.range1,
        bty='l',
        ylab='Number',
-       main=paste(states.ac[i],ages[j]))
+       main=paste(states.ac[i])
+  )
 
   points(dates1.ac,
          obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
@@ -1142,7 +1162,9 @@ sum(nyc.excess.acm[dates.select2,1,1])
 
 ```
 
-## Table S3: Proportion of COVID-19 deaths with a pneumonia code, by state
+## Table S2: Proportion of COVID-19 deaths with a pneumonia code, by state, through most recent date
+Note these values will be greater than those in other tables, which are 2 weeks behind
+
 ```{r}
 cdc.summary.state.clean <- cdc.summary.state[!is.nan(cdc.summary.state$covid.pct.pneum),c('ind', "NCHS Reported COVID-19 Deaths","NCHS Reported COVID-19 Deaths, with pneumonia code",'covid.pct.pneum')]
 
@@ -1154,7 +1176,7 @@ htmlTable(cdc.summary.state.clean)
 ```
 
 
-##Table S3: Do not adjust for underreporting of deaths
+## Table S3: Do not adjust for flu
 
 ```{r, tables1}
 count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <=max(pi.data$week_end) ,]
@@ -1186,7 +1208,7 @@ htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneum
 ```
 
 
-## Table S3: do not adjust for flu
+## Table S4: do not adjust for delayed reporting
 
 ```{r, include=F} 
 #Run analysis 
