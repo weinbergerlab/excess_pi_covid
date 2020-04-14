@@ -3,15 +3,15 @@ title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
 date: "4/3/2020"
 output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
   html_document:
     df_print: paged
     html_document: null
     toc: yes
     toc_depth: 2
     toc_float: yes
-  word_document:
-    toc: yes
-    toc_depth: '2'
 params:
   agg.level: 'state_region'
 ---
