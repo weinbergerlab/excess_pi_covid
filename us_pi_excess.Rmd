@@ -921,15 +921,21 @@ return(x)
 pi.data.clean.ny <- do.call('rbind.data.frame',min.state.ny)
 pi.data.clean.ny <- pi.data.clean.ny[!is.na(pi.data.clean.ny$miss.x),]
 
+pi.data.clean.ny$state.merge <- pi.data.clean.ny$state
+pi.data.clean.ny$state.merge[pi.data.clean.ny$state=='NYC'] <-'NY'
+pi.data.clean.ny <- merge(pi.data.clean.ny,clin4, by.x=c('state.merge', 'week_start'), by.y=c('state', 'wk_date'))
+
 #Run analysis
 pi.data.clean.ny$one <- 1
 pi.data.clean.ny$percent_complete.adj <-pi.data.clean.ny$percent_complete - 0.5 #subtract =0.5 because 0.5 is added in code
+
+
 excess_deaths1.ac <-
   excessCases(ds = pi.data.clean.ny,
               datevar       = "week_start",
               statevar      = "state",
               denom.var     = "percent_complete.adj",
-              adj.flu       = "none",
+              adj.flu       = "flu_pct_adj",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("all_deaths"),
               extrapolation.date = "2020-03-01",
@@ -1106,9 +1112,9 @@ points(dates1[dates.select.pi],excess_pi[dates.select.pi,'NJ',1], type='l', col=
 
 Fold difference between excess all-cause mortality and excess P&I mortality in NJ and NY. Shows that excess P&I accounts for ~50-60% of the excess deaths
 ```{r}
-excess_pi[dim(excess_pi)[1],'NJ',1]/excess_all_cause[dim(excess_all_cause)[1],'NJ',1]
+excess_all_cause[dim(excess_all_cause)[1],'NJ',1]/excess_pi[dim(excess_pi)[1],'NJ',1]
 
-excess_pi[dim(excess_pi)[1],'NY',1] /(excess_all_cause[dim(excess_all_cause)[1],'NY',1]+excess_all_cause[dim(excess_all_cause)[1],'NYC',1])
+(excess_all_cause[dim(excess_all_cause)[1],'NY',1]+excess_all_cause[dim(excess_all_cause)[1],'NYC',1])/excess_pi[dim(excess_pi)[1],'NY',1] 
 
 ```
  
@@ -1169,7 +1175,7 @@ Note these values will be greater than those in other tables, which are 2 weeks 
 cdc.summary.state.clean <- cdc.summary.state[!is.nan(cdc.summary.state$covid.pct.pneum),c('ind', "NCHS Reported COVID-19 Deaths","NCHS Reported COVID-19 Deaths, with pneumonia code",'covid.pct.pneum')]
 
 names(cdc.summary.state.clean) <- c('State',"NCHS Reported COVID-19 Deaths","NCHS Reported COVID-19 Deaths, with pneumonia code",'Proportion with pneumonia')
-cdc.summary.state.clean
+#cdc.summary.state.clean
 
 cdc.summary.state.clean$`Proportion with pneumonia` <- round(cdc.summary.state.clean$`Proportion with pneumonia`,2)
 htmlTable(cdc.summary.state.clean)
