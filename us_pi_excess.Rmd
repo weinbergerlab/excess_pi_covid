@@ -1178,7 +1178,7 @@ names(cdc.summary.state.clean) <- c('State',"NCHS Reported COVID-19 Deaths","NCH
 #cdc.summary.state.clean
 
 cdc.summary.state.clean$`Proportion with pneumonia` <- round(cdc.summary.state.clean$`Proportion with pneumonia`,2)
-htmlTable(cdc.summary.state.clean)
+htmlTable(cdc.summary.state.clean, rnames=F)
 ```
 
 
@@ -1210,7 +1210,7 @@ last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
 
-htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+htmlTable(count.excess3, caption=paste0('Table S3. Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
 ```
 
 
