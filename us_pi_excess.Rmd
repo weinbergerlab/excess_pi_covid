@@ -1,17 +1,19 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
-date: "4/3/2020"
+date: "4/17/2020"
 output:
+  pdf_document: 
+    keep_tex:  true
+  word_document:
+    toc: yes
+    toc_depth: '2'
   html_document:
     df_print: paged
     html_document: null
     toc: yes
     toc_depth: 2
     toc_float: yes
-  word_document:
-    toc: yes
-    toc_depth: '2'
 params:
   agg.level: 'state_region'
 ---
@@ -94,8 +96,8 @@ plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','WA' )
 
 
 ```{r}
-#Date when start counting excess deaths: 2 weeks prior to first reported COVID-19 death
-count.start.date <- as.Date('2020-02-09')
+#Date when start counting excess deaths: Start first week of Feb to Match CDC's COVIDview tables
+count.start.date <- as.Date('2020-01-26')
 ```
 
 
@@ -363,9 +365,9 @@ date.print <- max(pi.data.clean2$week_end)
 
 ```
 
+### Mortality data on deaths due to pneumonia & influenza through the week ending `r  date.print`
 
 ## Abstract
-Mortality data on deaths due to pneumonia & influenza through the week ending `r  date.print`
 
 *Background*
 Tracking the severity and public health impact of emerging diseases, such as the novel coronavirus diseases COVID-19, is a critical need. These efforts are often hampered by testing issues and reporting lags for key epidemiological data. Evaluating unexplained increases in deaths attributed to non-specific causes, such as pneumonia, can provide a more complete picture of the burden caused by COVID-19. 
@@ -389,7 +391,7 @@ excess_deaths1.adjusted <-
               adj.flu       = "flu_pct_adj_lag1",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("total_pni"),
-              extrapolation.date = "2020-03-01",
+              extrapolation.date = '2020-01-26',
               time.res='week')
 ```
 
@@ -938,7 +940,7 @@ excess_deaths1.ac <-
               adj.flu       = "flu_pct_adj",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("all_deaths"),
-              extrapolation.date = "2020-03-01",
+              extrapolation.date = '2020-01-26',
               time.res='week')
 ```
 
@@ -1129,7 +1131,7 @@ nyc.pi <-
               denom.var     = "all_deaths",
               adj.flu       = "none",
               use.syndromes = c("total_pni"),
-              extrapolation.date = "2020-03-01",
+              extrapolation.date = '2020-01-26',
               time.res='week')
 nyc.acm <-
   excessCases(ds = nyc.data,
@@ -1138,7 +1140,7 @@ nyc.acm <-
               denom.var     = "one",
               adj.flu       = "none",
               use.syndromes = c("all_deaths"),
-              extrapolation.date = "2020-03-01",
+              extrapolation.date = '2020-01-26',
               time.res='week')
 
 nyc.excess.pi <-  excessExtract(ds = 
