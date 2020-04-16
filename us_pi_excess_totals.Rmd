@@ -28,6 +28,8 @@ knitr::opts_chunk$set(
 )
 ```
 
+## WARNINGS
+The CDC fluview data do not seem to be updated over the course of the week (updated friday), while the COVIDview data are updated daily. As a result, it is NOT ok to just sum the pneumonia counts from fluview and subtract from the cumulative total in fluview to get an estimate for most recent week--this would lead to too many deaths being attributed to most recent week. This is only an issue if using a correction factor for under-reporting and trying to look at the trajectories. If just looking at the overall deaths since Feb 1 and not putting on a specific week, it doesn't matter if the deaths are attributed to 1 week ago, 2 weeks ago, etc. Relying on data pulled on mid-day friday would help mitigate this.
 
 ```{r, eval=F}
 if (!require("devtools")) {
@@ -51,6 +53,7 @@ library(htmlTable)
 library(RSocrata)
 library(pdftools)
 library(readr)
+library(dplyr)
 library(gsubfn)
 source('./functions/ts_plot_func.R')
 ```
@@ -95,7 +98,7 @@ plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','WA' )
 
 ```{r}
 #Date when start counting excess deaths: 2 weeks prior to first reported COVID-19 death
-count.start.date <- as.Date('2020-02-09')
+count.start.date <- as.Date('2020-01-26')
 ```
 
 
@@ -215,24 +218,30 @@ url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json"
 
 #ARCHIVE
 cdc.data <- runIfExpired('cdc_covid_data', ~fromJSON(file=url.cdc.covid, simplify=F))
-cdc.pneum.and.covid <- sapply(cdc.data,'[[', "pneumonia_and_covid_deaths"  )
-cdc.covid.death <- sapply(cdc.data,'[[', "covid_deaths"  )
-cdc.grp<-sapply(cdc.data,'[[', "group"  )
-cdc.ind<-sapply(cdc.data,'[[', "indicator"  )
 
-cdc.summary <- cbind.data.frame('grp'=cdc.grp,'ind'=cdc.ind,'NCHS Reported COVID-19 Deaths'=cdc.covid.death, 'NCHS Reported COVID-19 Deaths, with pneumonia code'=cdc.pneum.and.covid)
-cdc.summary.wk <- cdc.summary[cdc.summary$grp=='By week',]
-cdc.summary.wk$wk_end <- as.Date(cdc.summary.wk$ind, "%m/%d/%Y")
+cdc.data.df <- lapply(cdc.data, function(play) {
+  data.frame(matrix(unlist(play), ncol=8, byrow=T))
+  })
+cdc.data.df <- do.call(rbind, cdc.data.df)
+colnames(cdc.data.df) <- names(cdc.data[[1]])
+rownames(cdc.data.df) <- NULL
+
+cdc.summary.wk <- cdc.data.df[cdc.data.df$group=='By week',]
+cdc.summary.wk$wk_end <- as.Date(cdc.summary.wk$indicator, "%m/%d/%Y")
 cdc.summary.wk <- cdc.summary.wk[!is.na(cdc.summary.wk$wk_end),]
-cdc.summary.wk <- cdc.summary.wk[, c('wk_end', 'NCHS Reported COVID-19 Deaths','NCHS Reported COVID-19 Deaths, with pneumonia code')]
 
-cdc.summary.state <- cdc.summary[cdc.summary$grp=='By state',]
 
-cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code` <- as.numeric(as.character(cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code`))
+cdc.summary.state <- cdc.data.df[cdc.data.df$group=='By state',]
 
-cdc.summary.state$`NCHS Reported COVID-19 Deaths` <- as.numeric(as.character(cdc.summary.state$`NCHS Reported COVID-19 Deaths` ))
+cdc.summary.state[,-c(1:2)] <- apply(cdc.summary.state[,-c(1:2)],2, function(x) as.numeric(as.character(x)) )
 
-cdc.summary.state$covid.pct.pneum <- cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code`/cdc.summary.state$`NCHS Reported COVID-19 Deaths`
+cdc.summary.state$covid.pct.pneum <- cdc.summary.state$pneumonia_and_covid_deaths/cdc.summary.state$covid_deaths
+
+cdc.summary.state$covid_non_j12_18 <- 
+  cdc.summary.state$covid_deaths - 
+      cdc.summary.state$pneumonia_and_covid_deaths
+cdc.summary.state$state <- state.abb[match(cdc.summary.state$indicator, state.name)]
+
 ```
 
 ```{r}
@@ -327,6 +336,53 @@ clin4.lags <- merge(clin4.lags, clin4.lag2, by=c('state','wk_date'))
 
 ```
 
+```{r}
+#The fluview data go unti 2 weeks ago. But the NCHS data go until 1 week ago (cumulative).We can subtract the cumulative numbers from nchs from the cumulative numbers for our data to get estimate for total death and P&I for last week. This is not totally kosher if trying to estimate weekly death rates, because many of the deaths in that difference should be backfilled to earlier weeks. However, when evaluating cumulatively, this doesn't matter
+
+pi.data.spl <- 
+  split( pi.data, pi.data$region_name)
+
+#sum since week ending feb 1 2020
+pi.data.clean2.spl.cum <- t(sapply(pi.data.spl, function(x){
+  apply(x[x$week_end >=
+    as.Date('2020-02-01'),c('all_deaths','number_pneumonia')],
+    2,sum, na.rm=T)
+  }, 
+    simplify='array' 
+  )
+  )
+
+pi.data.clean2.spl.cum <- as.data.frame(pi.data.clean2.spl.cum)
+names(pi.data.clean2.spl.cum) <- c('all_deaths_2wklag','pneu_death_2wk_lag')
+
+pi.data.clean2.spl.cum$state <- row.names(pi.data.clean2.spl.cum)
+row.names(pi.data.clean2.spl.cum) <-NULL
+
+pi.data.clean2.spl.cum$state2 <-   
+ state.abb[match(pi.data.clean2.spl.cum$state, state.name)]
+pi.data.clean2.spl.cum$state2[pi.data.clean2.spl.cum$state =='New York City'] <- 'NYC'
+
+
+cdc.summary.state$state <-  
+      as.character(cdc.summary.state$indicator)
+
+update.pi <- merge(  cdc.summary.state, pi.data.clean2.spl.cum,by.x='state', by.y='state')
+
+update.pi$total_deaths_latest_wk <- update.pi$total_deaths -
+    update.pi$all_deaths_2wklag
+
+update.pi$pneu_deaths_latest_wk <- update.pi$pneumonia_deaths -
+    update.pi$pneu_death_2wk_lag
+
+update.pi2 <- update.pi[,c('state','pneu_deaths_latest_wk','total_deaths_latest_wk',"percent_expected_deaths" )]
+update.pi2$week_start <- as.Date(max(pi.data$week_start)) + weeks(1)
+update.pi2$week_end <- as.Date(max(pi.data$week_end)) + weeks(1)
+names(update.pi2) <- c('region_name', 'number_pneumonia', 'all_deaths', 'percent_complete','week_start', 'week_end')
+
+pi.data <-bind_rows(update.pi2,pi.data)
+
+```
+
 ```{r, include=F}
 #Format and fill mssings with 0s
 
@@ -340,16 +396,21 @@ pi.data$state_region[pi.data$state=='NYC'] <- 'NYC'
 pi.data$pct.comp.wgt <- pi.data$percent_complete*pi.data$all_deaths
 
 pi.data.ny.separate <- pi.data
+```
 
+
+```{r}
 #Combine NYC and NY state
 pi.data$state_region[pi.data$state=='NYC'] <- 'NY'
 
 
-pi.data.agg <- aggregate(pi.data[,c('total_pni','all_deaths','pct.comp.wgt')], by=list('state'=pi.data$state_region, 'week_start'=pi.data$week_start, 'week_end'=pi.data$week_end), FUN=sum, na.rm=T)
-pi.data.agg$percent_complete <- pi.data.agg$pct.comp.wgt/pi.data.agg$all_deaths
+pi.data.agg <- aggregate(pi.data[,c("number_pneumonia" ,'all_deaths','pct.comp.wgt')], by=list('state'=pi.data$state_region, 'week_start'=pi.data$week_start, 'week_end'=pi.data$week_end), FUN=sum, na.rm=T)
+
+pi.data.agg$percent_complete <- 
+  pi.data.agg$pct.comp.wgt/pi.data.agg$all_deaths
 
 spl1<-split(pi.data.agg, pi.data.agg$state)
-min.state <- lapply(spl1, function(x){ x$miss.x<-min(x$total_pni, na.rm=T)
+min.state <- lapply(spl1, function(x){ x$miss.x<-min(x$number_pneumonia, na.rm=T)
 return(x)
                 })
 pi.data.clean <- do.call('rbind.data.frame',min.state)
@@ -360,7 +421,6 @@ pi.data.clean2<- merge( pi.data.clean,clin4.lags, by.x=c('week_start', 'state'),
 states.cdc <- unique(pi.data.clean2$state)
 
 date.print <- max(pi.data.clean2$week_end)
-
 ```
 
 
@@ -388,8 +448,8 @@ excess_deaths1.adjusted <-
               denom.var     = "all_deaths",
               adj.flu       = "flu_pct_adj_lag1",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
-              use.syndromes = c("total_pni"),
-              extrapolation.date = "2020-03-01",
+              use.syndromes = c("number_pneumonia"),
+              extrapolation.date = "2020-02-01",
               time.res='week')
 ```
 
@@ -404,7 +464,7 @@ excess_deaths1.adjusted <-
 
 #Which syndrome do you want to plot, and over what time range?
 
-syndrome.select <- 'total_pni' #which syndrome do you want to plot?
+syndrome.select <- 'number_pneumonia' #which syndrome do you want to plot?
 n.days<-52  #How many days to plot?
 ds <- excess_deaths1.adjusted
 
@@ -626,7 +686,7 @@ jh3 <- merge(jh3, excess_deaths.var.m, by=c('state','date') , all=T)
 #jh3 <-jh3[jh3$state %in% states.cdc,]
 
 
-jh3 <- merge( jh3, pi.data.clean2[c('state', "week_start",'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
+jh3 <- merge( jh3, pi.data.clean2[c('state', "week_start", 'percent_complete')], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
 
 jh3 <- merge(jh3, test.ds3.spl, by=c('state','date'), all=T)
 jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
@@ -669,38 +729,55 @@ count.excess2 <- aggregate(count.excess[,c('excess_pi_adj','total_pi_adj','covid
 
 count.excess2 <- merge(count.excess2, pop2, by='state')
 
-count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
+cdc.summary.state.agg <- cdc.summary.state
+cdc.summary.state.agg$state <- state.abb[match(cdc.summary.state.agg$state , state.name)]
+ cdc.summary.state.agg$state[cdc.summary.state.agg$indicator=='New York City'] <- 'NY'
 
-count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
+ cdc.summary.state.agg <- aggregate(cdc.summary.state.agg[,'covid_non_j12_18'], by=list('state'=cdc.summary.state.agg$state), FUN=sum)
+ names(cdc.summary.state.agg) <- c('state', 'covid_non_j12_18')
+cdc.summary.state.agg <- 
+  merge(cdc.summary.state.agg, hhs_states.cw, by='state')
 
-count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))/count.excess2$census_bureau_pop_2019*1000000
+cdc.summary.state.agg <-
+  aggregate(cdc.summary.state.agg[,'covid_non_j12_18'], 
+            by=list('state'=cdc.summary.state.agg$state_region), 
+            FUN=sum)
+ names(cdc.summary.state.agg) <- c('state', 'covid_non_j12_18')
+ 
+count.excess2 <- merge(count.excess2, cdc.summary.state.agg, by='state')
 
-count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var_ADJ))/count.excess2$census_bureau_pop_2019*1000000
 
-count.excess2$exces_pi_INC <- count.excess2$excess_pi_adj/count.excess2$census_bureau_pop_2019*1000000
+count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi_adj +count.excess2$covid_non_j12_18 + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
 
-count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi_adj), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
+count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi_adj +count.excess2$covid_non_j12_18 - 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
+
+count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi_adj+count.excess2$covid_non_j12_18 + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi_adj +count.excess2$covid_non_j12_18- 1.96*sqrt(count.excess2$excess_pi_var_ADJ))/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$exces_pi_INC <- (count.excess2$excess_pi_adj + count.excess2$covid_non_j12_18)/count.excess2$census_bureau_pop_2019*1000000
+
+count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi_adj +count.excess2$covid_non_j12_18), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
 count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), ' (',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
 
 #sort by incidence
 count.excess2 <- count.excess2[rev(order(count.excess2$exces_pi_INC)),]
 
 count.excess2$total_pi_adj <- round(count.excess2$total_pi_adj)
-count.excess3 <- count.excess2[, c('state','total_pi_adj','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
-names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Reported COVID-19 deaths','Excess P&I deaths/1,000,000 people')
+
+count.excess3 <- count.excess2[, c('state','total_pi_adj', "excess_pi_adj" ,'covid_non_j12_18','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
+
+names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths','Non-J12-J18 COVID deaths', 'Combined Excess +COVID', 'Reported COVID-19 deaths','Excess deaths/1,000,000 people')
 last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
+count.excess3$`Excess P&I deaths` <-
+    round(count.excess3$`Excess P&I deaths`)
 
-htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 1, 2020 through ', last.date.format), rnames=F)
 ```
 
 
-```{r}
-## And finally,  use the NCHS COVID death data
-#(Not yet available with state-level resolution)
-#cdc.covid.url<- "https://data.cdc.gov/resource/hc4f-j6nb.json"
-```
 
 
 ## Figure 4: Compare Excess P&I mortality vs Excess ILI
@@ -850,11 +927,14 @@ Note excess P&I deaths and covidtracking.com numbers do not include Connecticut,
 ```{r}
 count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <= max(pi.data$week_end) ,]
 
-count.excess$excess_pi_adj <- count.excess$excess_pi/count.excess$percent_complete
+count.excess$excess_pi_adj <- 
+  count.excess$excess_pi/count.excess$percent_complete
 
-count.excess$total_pi_adj <- count.excess$total_pi/count.excess$percent_complete
+count.excess$total_pi_adj <- 
+  count.excess$total_pi/count.excess$percent_complete
 
-count.excess$excess_pi_var_ADJ <- count.excess$excess_pi_var/count.excess$percent_complete
+count.excess$excess_pi_var_ADJ <- 
+  count.excess$excess_pi_var/count.excess$percent_complete
 
 count.excess2 <- aggregate(count.excess[,c('excess_pi_adj','total_pi_adj','covid.track.death','excess_pi_var_ADJ')], by=list('date'=count.excess$date) ,FUN=sum)
 
@@ -878,9 +958,14 @@ last.date.format<-format(last.date.format,
 
 count.excess4 <- merge(count.excess3, cdc.summary.wk, by.x='Week ending', by.y='wk_end')
 
-count.excess4 <- count.excess4[, c("Week ending","Total P&I deaths","Excess P&I deaths","NCHS Reported COVID-19 Deaths, with pneumonia code", "NCHS Reported COVID-19 Deaths" , "All reported COVID-19 deaths (covidtracking.com)"  )]
+#count.excess4 <- 
+#  merge(count.excess4, cdc.summary.state.agg,by='state' )
+
+count.excess4 <- count.excess4[, c("Week ending","Total P&I deaths","Excess P&I deaths", "All reported COVID-19 deaths (covidtracking.com)"  )]
 
 htmlTable(count.excess4, caption=paste0('Table S1: Comparison of data sources: Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+
+
 ```
 
 ```{r}
@@ -896,11 +981,22 @@ count.excess.all$exces_ci_lcl <- round(count.excess.all$excess_pi_adj - 1.96*sqr
 
 count.excess.all$excess_pi_ci <- paste0(round(count.excess.all$excess_pi_adj), '(',  count.excess.all$exces_ci_lcl, ', ', count.excess.all$exces_ci_ucl,')'  ) 
 
-count.excess.all$excess_pi_ci
+#count.excess.all$excess_pi_ci
+#sum(cdc.summary.state.agg$covid_non_j12_18)
 
+count.excess.all$TOTAL_BURDEN <-
+  paste0(round(count.excess.all$excess_pi_adj+
+                 sum(cdc.summary.state.agg$covid_non_j12_18)),
+         '(',  
+         count.excess.all$exces_ci_lcl+
+           sum(cdc.summary.state.agg$covid_non_j12_18), 
+         ', ', 
+         count.excess.all$exces_ci_ucl+
+           sum(cdc.summary.state.agg$covid_non_j12_18),')'  ) 
+
+count.excess.all$TOTAL_BURDEN
 count.excess.all$covid.track.death
 
-sum(as.numeric(as.character(count.excess4$`NCHS Reported COVID-19 Deaths`)))
 ```
 
 
@@ -934,7 +1030,7 @@ excess_deaths1.ac <-
   excessCases(ds = pi.data.clean.ny,
               datevar       = "week_start",
               statevar      = "state",
-              denom.var     = "percent_complete.adj",
+              denom.var     = "one",
               adj.flu       = "flu_pct_adj",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("all_deaths"),
@@ -990,6 +1086,10 @@ rr.ac <-  excessExtract(ds = excess_deaths1.ac,
                 syndrome = syndrome.select,
                 extract.quantity = "resid1")
 
+pred.ac.var <-  excessExtract(ds = excess_deaths1.ac,
+                syndrome = syndrome.select,
+                extract.quantity = "pred.var")
+
 ```
 
 ```{r}
@@ -1003,6 +1103,7 @@ dates.select <- which(dates1 >= count.start.date)
 
 The black line shows the observed number of *all* deaths per week, regardless of cause. The red line and shaded area represent the 95% Prediction Interval. The latest data is for the week ending `r  max(dates1)+6`. Note that these are **adjusted** for percent completeness of the data. There are clear jumps in all-cause mortality in NY and NJ, other states less clear, probably due to reporting delays
 
+These time series plots are not necesarily useful..the spike in the last week is because these are deaths that need to be backfilled (when the databases are updated, they will be assigned to their correct week). So we should only look at these in aggregate
 ```{r fig.s1, fig.width=8, fig.height=7}
   par(mfrow=c(5,4), mar=c(3,4,1,1))
 
@@ -1071,6 +1172,37 @@ for(i in plot.state.indices){
   }
 }
 ```
+
+```{r}
+#Sum the excess
+sum.indices <-which(dates1.ac >= as.Date('2020-01-26'))
+
+sum.pred.ac <- 
+  apply(pred.ac[,,1],2, function(x) sum(x[sum.indices]))
+
+sum.obs.ac <-
+  apply(obs.ac[,,1],2, function(x) sum(x[sum.indices]))
+
+sum.pred.var <-
+  apply(pred.ac.var[,,1],2, function(x) sum(x[sum.indices]))
+ 
+excess.ac <-  
+  sum.obs.ac - sum.pred.ac
+
+excess.ac.ucl <- 
+  round( sum.obs.ac -sum.pred.ac + 1.96*sqrt(sum.pred.var))
+
+excess.ac.lcl <- 
+  round( sum.obs.ac -sum.pred.ac - 1.96*sqrt(sum.pred.var))
+
+
+excess.ci <- cbind.data.frame('state'=names(excess.ac),
+ 'Predicted'=paste0(round(excess.ac), ' (', excess.ac.lcl,',',excess.ac.ucl,')' )) 
+
+sum(excess.ac)
+
+```
+
 
 
 ## Figure S2: Excess all-cause deaths for NY state (incl NYC) vs Excess deaths due to pneumonia and influenza
