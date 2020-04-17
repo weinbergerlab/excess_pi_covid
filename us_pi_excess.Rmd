@@ -3,17 +3,17 @@ title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
 date: "4/17/2020"
 output:
-  pdf_document: 
-    keep_tex:  true
-  word_document:
-    toc: yes
-    toc_depth: '2'
   html_document:
     df_print: paged
     html_document: null
     toc: yes
     toc_depth: 2
     toc_float: yes
+  word_document:
+    toc: yes
+    toc_depth: '2'
+  pdf_document: 
+    keep_tex:  true
 params:
   agg.level: 'state_region'
 ---
@@ -366,6 +366,16 @@ date.print <- max(pi.data.clean2$week_end)
 ```
 
 ### Mortality data on deaths due to pneumonia & influenza through the week ending `r  date.print`
+
+Dan Weinberger,^1^  Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^ 
+
+^1^Department of Epidemiology of Microbial Diseases and the Public Health Modeling Unit, Yale School of Public Health, New Haven, CT
+^2^Department of Biostatistics and the Public Health Modeling Unit, Yale School of Public Health, New Haven, CT; Yale Departments of Ecology and Evolutionary Biology, Statistics & Data Science, Yale School of Management
+^3^Aledade, Inc
+^4^Department of Health and Mental Hygiene, New York City, NY
+^5^Department of Biostatistics and Epidemiology, School of Public Health and Health Sciences, University of Massachusetts, Amherst, MA
+^6^Department of Science and Environment, Roskilde University, Denmark
+^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
 
 ## Abstract
 
