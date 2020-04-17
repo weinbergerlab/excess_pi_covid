@@ -377,6 +377,9 @@ Dan Weinberger,^1^  Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3
 ^6^Department of Science and Environment, Roskilde University, Denmark
 ^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
 
+##NOTE
+Starting April 17, fluview started reporting death data with a 1 week lag, rather than a 2 week lag. Data from the previous week is highly incomplete and should be interpreted with caution
+
 ## Abstract
 
 *Background*
@@ -704,7 +707,7 @@ last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
 
-htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from January 26, 2020 through ', last.date.format), rnames=F)
 ```
 
 
@@ -858,7 +861,7 @@ cp.pi.waics <- round(sapply(cp.pi,'[[', 'w.aics'),2)
 
 
 ## Table S1: Excess deaths by week across the US, compared with provisional death counts from NCHS
-Note excess P&I deaths and covidtracking.com numbers do not include Connecticut, North Carolina, and West Virginia  
+Note excess P&I deaths and covidtracking.com numbers do not include Connecticut, North Carolina, and West Virginia. Combining together the exces P&I and COIVD-19 deaths without pneumonia diagnoses gives an estimate for number of deaths   
 ```{r}
 count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <= max(pi.data$week_end) ,]
 
@@ -890,9 +893,13 @@ last.date.format<-format(last.date.format,
 
 count.excess4 <- merge(count.excess3, cdc.summary.wk, by.x='Week ending', by.y='wk_end')
 
-count.excess4 <- count.excess4[, c("Week ending","Total P&I deaths","Excess P&I deaths","NCHS Reported COVID-19 Deaths, with pneumonia code", "NCHS Reported COVID-19 Deaths" , "All reported COVID-19 deaths (covidtracking.com)"  )]
+count.excess4$`NCHS Reported COVID-19 Deaths, no pneumonia code` <- 
+  as.numeric(as.character(count.excess4$`NCHS Reported COVID-19 Deaths`)) -
+  as.numeric(as.character(count.excess4$`NCHS Reported COVID-19 Deaths, with pneumonia code`))
 
-htmlTable(count.excess4, caption=paste0('Table S1: Comparison of data sources: Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+count.excess4 <- count.excess4[, c("Week ending","Total P&I deaths","Excess P&I deaths","NCHS Reported COVID-19 Deaths, with pneumonia code", "NCHS Reported COVID-19 Deaths, no pneumonia code","NCHS Reported COVID-19 Deaths" , "All reported COVID-19 deaths (covidtracking.com)"  )]
+
+htmlTable(count.excess4, caption=paste0('Table S1: Comparison of data sources: Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from January 26, 2020 through ', last.date.format), rnames=F)
 ```
 
 ```{r}
@@ -1053,6 +1060,15 @@ for(i in plot.state.indices){
 }
 ```
 
+```{r}
+#Sum excess across all states
+select.indices <-which(dates1.ac >=as.Date('2020-01-26'))
+pred.all <- apply(pred.ac[select.indices,,1],1,sum)
+obs.all <- apply(obs.ac[select.indices,,1],1,sum)
+obs.all - pred.all
+```
+
+
 ```{r, eval=F}
 #Just NY
 par(mfrow=c(1,2))
@@ -1060,7 +1076,7 @@ par(mfrow=c(1,2))
 for(i in plot.state.indices){
   for(j in 1:dim(pred.ac)[3]){
     y.range1<-range(c( pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j], upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j],0))
-  plot(dates1.ac,
+  plot(dates1.ac[select.indices],
        pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
        type='l',
        col='red',
@@ -1069,13 +1085,13 @@ for(i in plot.state.indices){
        ylab='Number',
        main=paste(states.ac[i],ages[j]))
 
-  points(dates1.ac,
+  points(dates1.ac[select.indices],
          obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
          type='l',
          col='black')
 
-  polygon(c(dates1.ac,
-            rev(dates1.ac)),
+  polygon(c(dates1.ac[select.indices],
+            rev(dates1.ac[select.indices])),
           c(lpi.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
             rev(upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j])),
           col = rgb(1, 0, 0, alpha = 0.1),
@@ -1222,7 +1238,7 @@ last.date.format<-max(pi.data$week_end)
 last.date.format<-format(last.date.format,
                          "%b %d, %Y")
 
-htmlTable(count.excess3, caption=paste0('Table S3. Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from February 9, 2020 through ', last.date.format), rnames=F)
+htmlTable(count.excess3, caption=paste0('Table S3. Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from January 26, 2020 through ', last.date.format), rnames=F)
 ```
 
 
@@ -1384,7 +1400,7 @@ compare.excess <- compare.excess[rev(order(compare.excess$excess_pi_count)),]
 
 compare.excess$excess_pi_count <-NULL
 
-htmlTable(compare.excess, caption=paste0('Excess deaths due to pneumonia & influenza from February 9, 2020 through ', last.date.format, ' with or without adjustment for delayed reporting'), rnames=F)
+htmlTable(compare.excess, caption=paste0('Excess deaths due to pneumonia & influenza from January 26, 2020 through ', last.date.format, ' with or without adjustment for delayed reporting'), rnames=F)
 ```
 
 
