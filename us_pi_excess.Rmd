@@ -949,11 +949,33 @@ pi.data.clean.ny$one <- 1
 pi.data.clean.ny$percent_complete.adj <-pi.data.clean.ny$percent_complete - 0.5 #subtract =0.5 because 0.5 is added in code
 
 
+#pi.data.clean.ny
+#1.6*1.2*1.07*1.04*1.02*1.01^4
+pi.data.clean.ny$pull.date <- as.Date('2020-04-17')
+pi.data.clean.ny$data.age <- round(as.vector(difftime(pi.data.clean.ny$pull.date,pi.data.clean.ny$week_end,  units='week')))
+
+pi.data.clean.ny$under.report.correct <- 1
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age ==1] <- 1/(1.6*1.2*1.07*1.04*1.02*1.01^4)
+
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age ==2] <- 1/(1.2*1.07*1.04*1.02*1.01^4)
+
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age ==3] <- 1/(1.07*1.04*1.02*1.01^4)
+
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age ==4] <- 1/(1.04*1.02*1.01^4)
+
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age ==5] <- 1/(1.02*1.01^4)
+
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age ==6] <- 1/(1.01^4)
+
+pi.data.clean.ny$under.report.correct[pi.data.clean.ny$data.age >=7 & pi.data.clean.ny$data.age <=10] <- 1/(1.01^4)
+
+pi.data.clean.ny$under.report.correct <- pi.data.clean.ny$under.report.correct-0.5
+
 excess_deaths1.ac <-
   excessCases(ds = pi.data.clean.ny,
               datevar       = "week_start",
               statevar      = "state",
-              denom.var     = "percent_complete.adj",
+              denom.var     = "under.report.correct",
               adj.flu       = "flu_pct_adj",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("all_deaths"),
@@ -1030,12 +1052,12 @@ plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
 plot.state.indices <- plot.state.rank$state.index
 states.ac <-dimnames(pred.ac)[[2]]
 
-select.indices <- which(dates1.ac >= as.Date('2009-04-01'))
+select.indices <- which(dates1.ac >= as.Date('2020-02-01'))
 
 for(i in plot.state.indices){
   for(j in 1:dim(pred.ac)[3]){
     y.range1<-range(c( pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j], upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j],0))
-  plot(dates1.ac,
+  plot(dates1.ac[select.indices],
        pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
        type='l',
        col='red',
@@ -1045,13 +1067,13 @@ for(i in plot.state.indices){
        main=paste(states.ac[i])
   )
 
-  points(dates1.ac,
+  points(dates1.ac[select.indices],
          obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
          type='l',
          col='black')
 
-  polygon(c(dates1.ac,
-            rev(dates1.ac)),
+  polygon(c(dates1.ac[select.indices],
+            rev(dates1.ac[select.indices])),
           c(lpi.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
             rev(upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j])),
           col = rgb(1, 0, 0, alpha = 0.1),
@@ -1063,9 +1085,12 @@ for(i in plot.state.indices){
 ```{r}
 #Sum excess across all states
 select.indices <-which(dates1.ac >=as.Date('2020-01-26'))
-pred.all <- apply(pred.ac[select.indices,,1],1,sum)
-obs.all <- apply(obs.ac[select.indices,,1],1,sum)
+pred.all <- apply(pred.ac[select.indices,,1]/denom.ac[select.indices,,1],1,sum)
+obs.all <- apply(obs.ac[select.indices,,1]/denom.ac[select.indices,,1],1,sum)
 obs.all - pred.all
+
+sum(obs.ac[select.indices,,1]/denom.ac[select.indices,,1]) - 
+  sum(pred.ac[select.indices,,1]/denom.ac[select.indices,,1]) 
 ```
 
 
@@ -1126,14 +1151,14 @@ par(mfrow=c(1,2), mar=c(2,4,1,1))
 # 
 # sum(excess_all_cause[dates.select,'NYC',1] )
 
-plot(dates1.ac[dates.select],excess_all_cause[dates.select,'NY',1]+excess_all_cause[dates.select,'NYC',1], type='l', bty='l', ylab='Excess deaths (N)', main='New York, incl NYC')
-points(dates1[dates.select.pi],excess_pi[dates.select.pi,'NY',1], type='l', col='red')
+plot(dates1.ac[dates.select],excess_all_cause[dates.select,'NY',1]/denom.ac[dates.select,'NY',1]+excess_all_cause[dates.select,'NYC',1]/denom.ac[dates.select,'NY',1], type='l', bty='l', ylab='Excess deaths (N)', main='New York, incl NYC')
+points(dates1[dates.select.pi],excess_pi[dates.select.pi,'NY',1]/denom.ac[dates.select,'NY',1], type='l', col='red')
 points(report.ny$date, report.ny$covid.track.death, col='blue', type='l', lty=2)
  legend(as.Date('2020-02-09'), 1500, legend=c("Excess all-cause deaths",   "Excess P&I deaths", 'Reported COVID-19'),
        col=c("black", "red", 'blue'), lty=c(1,1,2), cex=0.8) 
 
-plot(dates1.ac[dates.select],excess_all_cause[dates.select,'NJ',1], type='l', bty='l', ylab='Excess deaths (N)', main='New Jersey')
-points(dates1[dates.select.pi],excess_pi[dates.select.pi,'NJ',1], type='l', col='red')
+plot(dates1.ac[dates.select],excess_all_cause[dates.select,'NJ',1]/denom.ac[dates.select,'NY',1], type='l', bty='l', ylab='Excess deaths (N)', main='New Jersey')
+points(dates1[dates.select.pi],excess_pi[dates.select.pi,'NJ',1]/denom.ac[dates.select,'NY',1], type='l', col='red')
 
 ```
 
@@ -1441,7 +1466,7 @@ round(1/ave.change$change,2)
 #for data from 2 weeks ago:
 #obs_t-2/1.2*1.07*1.04*1.02*1.01^4
 
-#for data from 1 week ago:
+#for data from 1 week ago: (get from nchs waybackmachine)
 #obs_t-1/1.6*1.2*1.07*1.04*1.02*1.01^4
 
 #Based on national All-cause deaths
