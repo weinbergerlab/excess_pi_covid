@@ -377,7 +377,7 @@ Dan Weinberger,^1^  Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3
 ^6^Department of Science and Environment, Roskilde University, Denmark
 ^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
 
-##NOTE
+## IMPORTANT NOTE
 Starting April 17, fluview started reporting death data with a 1 week lag, rather than a 2 week lag. Data from the previous week is highly incomplete and should be interpreted with caution
 
 ## Abstract
@@ -1403,4 +1403,50 @@ compare.excess$excess_pi_count <-NULL
 htmlTable(compare.excess, caption=paste0('Excess deaths due to pneumonia & influenza from January 26, 2020 through ', last.date.format, ' with or without adjustment for delayed reporting'), rnames=F)
 ```
 
+
+
+```{r}
+##Look at backfilling rates
+d1 <- readRDS('./Data/pi_mortality_state/2020_04_13_20_55.rds')
+d2 <- readRDS('./Data/pi_mortality_state/2020_04_17_11_03.rds')
+
+#Date through March 28, released April 10
+d1 <- d1[ ,c('week_end','all_deaths','region_name' )]
+
+#Data through April 10, released April 17
+d2 <- d2[ ,c('week_end','all_deaths','region_name')]
+
+names(d1) <- c('date','deaths_rec_2020_04_10','state')
+names(d2) <- c('date','deaths_rec_2020_04_17','state')
+
+compare.back <- merge(d1, d2, by=c('date','state'))
+
+compare.back$change <- compare.back$deaths_rec_2020_04_10/compare.back$deaths_rec_2020_04_17
+
+dates.select <- which(compare.back$date >= as.Date('2020-01-01'))
+#First set of dates show 2 vs 3 weeks back
+#Next shows 3 vs 4 weeks back, etc
+plot(compare.back$date[dates.select], compare.back$change[dates.select])
+
+#View(compare.back)
+
+ave.change <- 
+  aggregate(compare.back[,'change', drop=F], by=list('date'=compare.back$date), FUN=mean, na.rm=T)
+plot(ave.change$change)
+
+round(1/ave.change$change,2)
+
+#For data from 3 weeks ago, to get correct version will be obs_t-3/(1.07*1.04*1.02*1.01^4)
+
+#for data from 2 weeks ago:
+#obs_t-2/1.2*1.07*1.04*1.02*1.01^4
+
+#for data from 1 week ago:
+#obs_t-1/1.6*1.2*1.07*1.04*1.02*1.01^4
+
+#Based on national All-cause deaths
+
+
+
+```
 
