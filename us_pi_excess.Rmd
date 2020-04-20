@@ -405,6 +405,7 @@ excess_deaths1.adjusted <-
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("total_pni"),
               extrapolation.date = '2020-01-26',
+              model.type='poisson',
               time.res='week')
 ```
 
@@ -427,7 +428,11 @@ ds <- excess_deaths1.adjusted
 
 dates1 <-
   ds[[1]][[1]][[1]]$date
-  
+
+disp1 <-
+  excessExtract(ds = ds,
+                syndrome = syndrome.select,
+                extract.quantity = "disp")  
 unexplained.cases <-
   excessExtract(ds = ds,
                 syndrome = syndrome.select,
@@ -980,6 +985,7 @@ excess_deaths1.ac <-
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("all_deaths"),
               extrapolation.date = '2020-01-26',
+              model.type='poisson',
               time.res='week')
 ```
 
@@ -1441,13 +1447,60 @@ d1 <- d1[ ,c('week_end','all_deaths','region_name' )]
 #Data through April 10, released April 17
 d2 <- d2[ ,c('week_end','all_deaths','region_name')]
 
-names(d1) <- c('date','deaths_rec_2020_04_10','state')
-names(d2) <- c('date','deaths_rec_2020_04_17','state')
+names(d1) <- c('date','2020-04-10','state')
+names(d2) <- c('date','2020-04-17','state')
 
-compare.back <- merge(d1, d2, by=c('date','state'))
+compare.back1 <- merge(d1, d2, by=c('date','state'), all=T)
 
+
+compare.m <- melt(compare.back1, id.vars  =c('date','state'))
+names(compare.m) <- c('death_date','state','report_date','N_deaths')
+compare.m$report_date <-as.Date(compare.m$report_date)
+compare.m$death_date <-as.Date(compare.m$death_date)
+
+compare.m$complete.weeks <- round(as.vector(difftime(compare.m$report_date,
+          compare.m$death_date, units='weeks')))
+
+library(INLA)
+t2 <- as.vector(difftime(compare.m$death_date, min(compare.m$death_date),units='weeks' ))
+compare.m$sin52= sin(2*pi*t2/52.1775)
+compare.m$cos52= cos(2*pi*t2/52.1775)
+compare.m$sin26= sin(2*pi*t2*2/52.1775)
+compare.m$cos26= cos(2*pi*t2*2/52.1775)
+year1 <- year(compare.m$death_date)
+month1 <- month(compare.m$death_date)
+compare.m$epiyr <- year1
+compare.m$epiyr[month1 <=6] <- year1[month1 <=6]-1
+compare.m$epiyr <-as.factor(epiyr)
+compare.m$complete.weeks[compare.m$complete.weeks>10] <- 10 
+compare.m$rev.weeks <- 10- compare.m$complete.weeks 
+
+compare.m$complete.weeks <- 
+  as.factor(compare.m$complete.weeks)
+compare.m$complete.weeks <- 
+  relevel(compare.m$complete.weeks, '10')
+compare.m$state <- 
+  as.factor(compare.m$state)
+form1 <- as.formula("N_deaths ~sin52 + cos52 +sin26 +cos26 +epiyr +f(state, model='iid') + 
+                    #f(rev.weeks,model='ar1') 
+                    complete.weeks
+                    "  )
+
+
+compare.m <- compare.m[compare.m$death_date >= as.Date('2016-07-01'),]
+dat.inla <- inla(form1, family='poisson',
+   data=compare.m,
+   control.family=list(link='log'),
+   control.predictor=list(link=1, compute=TRUE),
+   control.compute=list(dic=TRUE, cpo=TRUE, waic=TRUE))
+            #examine the regular summary 
+summary(dat.inla)
+plot(dat.inla$summary.random$rev.weeks[ ,"mean"],ylab="fitting result",type="l")
+points(dat.inla$summary.random$rev.weeks$`0.025quant`, type='l', lty=2)
+points(dat.inla$summary.random$rev.weeks$`0.975quant`, type='l', lty=2)
+
+compare.back <-compare.back1
 compare.back$change <- compare.back$deaths_rec_2020_04_10/compare.back$deaths_rec_2020_04_17
-
 dates.select <- which(compare.back$date >= as.Date('2020-01-01'))
 #First set of dates show 2 vs 3 weeks back
 #Next shows 3 vs 4 weeks back, etc
