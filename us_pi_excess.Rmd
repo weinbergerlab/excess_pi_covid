@@ -16,6 +16,7 @@ output:
     keep_tex:  true
 params:
   agg.level: 'state_region'
+  n.days.filter: 13
 ---
 
 ```{r, include = F}
@@ -112,6 +113,13 @@ pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state
 
 pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) &pi.data$geo_description=='State',]
 
+last.date.avail.pi <- 
+  max(pi.data$week_end)
+last.date.obtained <- 
+  last.date.avail.pi +6 #release date fr latest data (if            weekly)
+ pi.data <- pi.data[pi.data$week_end <=
+                      (last.date.obtained-params$n.days.filter),]
+
 pi.data.miss.states <- unique(pi.data.last$region_name[is.na(pi.data.last$total_pni)])
 
 pi.data.not.miss.states <- unique(pi.data.last$region_name[!is.na(pi.data.last$total_pni)])
@@ -120,6 +128,8 @@ pi.data.not.miss.states <- state.abb[match(pi.data.not.miss.states, state.name)]
 
 pi.data.not.miss.states <-
   pi.data.not.miss.states[!is.na(pi.data.not.miss.states)]
+
+
 ```
 
 ```{r}
