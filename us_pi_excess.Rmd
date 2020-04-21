@@ -388,7 +388,7 @@ Dan Weinberger,^1^  Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3
 ^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
 
 ## IMPORTANT NOTE
-Starting April 17, fluview started reporting death data with a 1 week lag, rather than a 2 week lag. Data from the previous week is highly incomplete and should be interpreted with caution
+Starting April 17, fluview started reporting death data with a 1 week lag, rather than a 2 week lag. Data from the recent weeks are highly incomplete and should be interpreted with caution
 
 ## Abstract
 
@@ -618,7 +618,7 @@ htmlTable(cumsum_excess_deaths_national)
 
 
 ## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The blue line shows the number of excess P&I cases, the red solid line shows the reported number of COVID-19 deaths for the same week (as compiled by the Johns Hopkins CSEE), and the dotted red line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet available. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
+The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by the Johns Hopkins CSEE), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
 
 ```{r}
 excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
