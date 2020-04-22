@@ -54,6 +54,8 @@ library(RSocrata)
 library(pdftools)
 library(readr)
 library(gsubfn)
+library(INLA)
+
 source('./functions/ts_plot_func.R')
 ```
 
@@ -1435,7 +1437,6 @@ htmlTable(compare.excess, caption=paste0('Excess deaths due to pneumonia & influ
 ```
 
 
-
 ```{r}
 ##Look at backfilling rates
 d1 <- readRDS('./Data/pi_mortality_state/2020_04_13_20_55.rds')
@@ -1526,5 +1527,296 @@ round(1/ave.change$change,2)
 
 
 
+```
+
+## Backfilling
+
+```{r}
+#Data from Andrew:NOTE: it looks like July-oct 2019 is missing from these data
+wk11 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data11.csv')
+wk11$max.date.report <- as.Date('2020-03-14')
+wk11$report.date <- as.Date('2020-03-27')
+
+wk12 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data12.csv')
+wk12$max.date.report <- as.Date('2020-03-21')
+wk12$report.date <- as.Date('2020-04-03')
+
+wk13 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data13.csv')
+wk13$max.date.report <- as.Date('2020-03-28')
+wk13$report.date <- as.Date('2020-04-10')
+
+wk15 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data15.csv')
+wk15$max.date.report <- as.Date('2020-04-11')
+wk15$report.date <- as.Date('2020-04-17')
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15)
+
+all.reports$epiyr <-
+  as.numeric(as.character(substr(all.reports$SEASON,1,4)))
+
+all.reports$year <- all.reports$epiyr
+all.reports$year[all.reports$WEEK<=26] <-
+  all.reports$epiyr[all.reports$WEEK<=26] +1
+all.reports$week.death <-
+  mmwr_week_to_date(all.reports$year, all.reports$WEEK)+6
+
+#Fix formatting for the count variables
+all.reports$NUM.INFLUENZA.DEATHS <-
+  gsub(',','',all.reports$NUM.INFLUENZA.DEATHS) 
+all.reports$NUM.INFLUENZA.DEATHS <-  as.numeric(as.character(all.reports$NUM.INFLUENZA.DEATHS)) 
+
+all.reports$NUM.PNEUMONIA.DEATHS <-
+  gsub(',','',all.reports$NUM.PNEUMONIA.DEATHS) 
+all.reports$NUM.PNEUMONIA.DEATHS <-  as.numeric(as.character(all.reports$NUM.PNEUMONIA.DEATHS)) 
+
+all.reports$TOTAL.DEATHS <-
+  gsub(',','',all.reports$TOTAL.DEATHS) 
+all.reports$TOTAL.DEATHS <-  as.numeric(as.character(all.reports$TOTAL.DEATHS))
+
+compare.m <- melt(all.reports[,c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS" )], id.vars  =c("week.death",'SUB.AREA',"report.date"))
+
+names(compare.m) <- 
+  c('death_date','state','report_date','variable','N_deaths')
+
+compare.m$report_date <-as.Date(compare.m$report_date)
+compare.m$death_date <-as.Date(compare.m$death_date)
+
+compare.m$complete.weeks <- round(as.vector(difftime(compare.m$report_date,
+          compare.m$death_date, units='weeks')))
+#compare.m$complete.weeks[compare.m$complete.weeks>5] <-5
+
+compare.c <- dcast( compare.m[,c('death_date','state','report_date','N_deaths')], state+ death_date ~ report_date, value.var='N_deaths', fun.aggregate = mean)
+
+
+new.reports <- compare.c
+new.reports[,-c(1:2)] <- 
+  apply(new.reports[,-c(1:2)],2, function(x){ 
+    x[is.nan(x)] <- 0 
+    return(x)
+  
+  })
+new.reports2 <- new.reports
+#count new reports
+#for(i in 2:4){
+# new.reports2[,(2+i)]  <- 
+#   new.reports[,(2+i)] - new.reports[,(2+i-1 )]
+#}
+
+new.reports2.m <- 
+  melt(new.reports2, id.vars=c('state', 'death_date'))
+
+names(new.reports2.m) <- c('state','death_date', 'report_date','N_new_reports')
+
+new.reports2.m$death_date <- 
+  as.Date( new.reports2.m$death_date)
+
+new.reports2.m$report_date <- 
+  as.Date( new.reports2.m$report_date)
+
+new.reports2.m$time.report <-
+  round(as.numeric(difftime(new.reports2.m$report_date,
+     new.reports2.m$death_date,units='weeks') ))
+
+new.reports2.m$time.report[new.reports2.m$time.report>=5] <-5
+
+new.reports2.m$time.report <-
+  as.numeric(as.character(new.reports2.m$time.report))
+
+#filter observations when report date is before death date
+new.reports2.m <-
+  new.reports2.m[(new.reports2.m$time.report > 0 & new.reports2.m$report_date>=as.Date('2020-04-11')) | (new.reports2.m$time.report > 1 & new.reports2.m$report_date<as.Date('2020-04-11')) 
+                   ,] 
+
+new.reports2.m <-
+  new.reports2.m[new.reports2.m$time.report>0,] 
+
+new.reports2.m$N_new_reports[new.reports2.m$N_new_reports<0] <- 0
+```
+
+Now setup a model
+```{r, fig.width=12, fig.height=12}
+compare.m1 <- new.reports2.m
+
+# for recent dates,
+date.fill1 <- unique(compare.m1[,c('death_date','time.report' ,'state')])
+date.fill1.spl <- split(date.fill1,
+                       paste( date.fill1$death_date,
+                              date.fill1$state))
+
+date.fill1.spl <- lapply(date.fill1.spl, function(x){
+  x$time.report <-
+    as.numeric(as.character(x$time.report))
+  
+  max.time.date <- 
+    max( x$time.report, na.rm=T)
+  state1 <-unique(x$state)
+  min.time.date <- 
+    min( x$time.report, na.rm=T)
+  
+  if(max.time.date < 5){
+    time.report2<-seq(from=min.time.date, to=5)
+    date.rep <- rep(x$death_date, length(time.report2))
+    date.time1 <-
+      cbind.data.frame('time.report'=time.report2,
+                       'death_date'= date.rep)
+    x <- merge(x, date.time1, 
+               by=c('death_date', 'time.report'), all=T)
+    x$state <- state1
+    }
+  return(x)
+})
+
+date.fill2 <- do.call('rbind.data.frame', date.fill1.spl)
+date.fill2 <- unique(date.fill2)
+
+compare.m <- merge(compare.m1, date.fill2,
+                   by=c('death_date', 
+                        'time.report', 'state'),
+                   all=T)
+
+compare.m$time.report <- 
+  as.factor(compare.m$time.report)
+
+compare.m$time.report <-
+  relevel(compare.m$time.report,'5')
+
+compare.m$t2 <- 
+  as.numeric(difftime(compare.m$death_date,
+               min(compare.m$death_date),
+               units='weeks'))
+compare.m$sin52= sin(2*pi*compare.m$t2/52.1775)
+compare.m$cos52= cos(2*pi*compare.m$t2/52.1775)
+compare.m$sin26= sin(2*pi*compare.m$t2*2/52.1775)
+compare.m$cos26= cos(2*pi*compare.m$t2*2/52.1775)
+year1 <- year(compare.m$death_date)
+month1 <- month(compare.m$death_date)
+compare.m$epiyr <- year1
+compare.m$epiyr[month1 <=6] <- year1[month1 <=6]-1
+compare.m$epiyr <-as.factor(compare.m$epiyr)
+```
+
+
+```{r, fig.width=12, fig.height=12}
+inla.func <- function(state.select){
+  ny1 <- compare.m[compare.m$state ==state.select ,]
+  ny1 <- ny1[!is.na(ny1$death_date),]
+  ny1$death_date.fac <- as.factor(ny1$death_date)
+  time.dummies <- model.matrix(~ time.report, data=ny1)
+  ny1 <- cbind.data.frame(ny1, time.dummies[,-1])
+  ny1$death_date.fac2 <- ny1$death_date.fac
+  form1 <- 
+    as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 +  f(death_date.fac, model='ar1')")
+  dat.inla <- inla(form1, family='poisson',
+     data=ny1,
+     control.family=list(link='log'),
+     control.predictor=list(link=1, compute=TRUE),
+     control.compute=list(dic=TRUE, cpo=TRUE, waic=TRUE))
+              #examine the regular summary 
+ # summary(dat.inla)
+  
+fixed.effect <- dat.inla$summary.fixed[,c('sd','0.025quant','0.5quant','0.975quant')]
+  results1<-list('input.data'=ny1,'dat.inla'=dat.inla,'fixed.effect'=fixed.effect )
+return(results1)
+}
+
+states.test <- c('Alabama','Arizona','Arkansas','Colorado', 'District of Columbia', 'Florida','Georgia','Idaho','Illinois','Indiana','Kansas','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','Montana','Nevada','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Washington')
+
+#plot the RR
+plot.func.inla.rr <- function(inla.ds){
+  dat.inla <- inla.ds$dat.inla
+  ny1 <- inla.ds$input.data
+  state.select <- unique(ny1$state)
+  rand <-
+    cbind.data.frame('death_date'=unique(ny1$death_date),dat.inla$summary.random)
+  
+  pred.combined <- cbind.data.frame(dat.inla$summary.fitted.values, ny1)
+  
+  pred.combined <- pred.combined[order(pred.combined$state, pred.combined$death_date),]
+  
+  pred.combined %>% tidyr::fill('N_new_reports')
+  
+  pred.sub <-pred.combined[pred.combined$death_date >= as.Date('2020-01-01') & pred.combined$time.report=='5' ,]
+  y.range1 <- range(c(pred.sub$`0.975quant`, pred.sub$`0.025quant`, 0))
+  # plot(pred.sub$death_date , pred.sub$mean,ylim=y.range1, col='white', main=state.select, bty='l')
+  #  polygon(c(pred.sub$death_date,
+  #             rev(pred.sub$death_date)),
+  #           c(pred.sub$`0.025quant`,
+  #             rev(pred.sub$`0.975quant`)),
+  #             col = rgb(1, 0, 0, alpha = 0.1),
+  #           border = NA
+  #             )
+  #  points(pred.sub$death_date,pred.sub$N_new_reports)
+  
+  rand2 <- rand[rand$death_date>=as.Date('2020-01-01'),]  
+  y.range1 <- range(exp(c(rand2$death_date.fac.0.025quant, rand2$death_date.fac.0.975quant)))
+
+   plot(rand2$death_date , 
+        exp(rand2$death_date.fac.0.5quant),
+        ylim=c(0.8, 3), lty=1,col='red',type='l',
+        main=state.select, bty='l',
+        ylab='Rate ratio all-cause deaths')
+    polygon(c(rand2$death_date,
+               rev(rand2$death_date)),
+             exp(c(rand2$death_date.fac.0.025quant,
+               rev(rand2$death_date.fac.0.975quant))),
+               col = rgb(1, 0, 0, alpha = 0.1),
+             border = NA
+               )
+    abline(h=1, lty=2, col='gray')
+    abline(v=as.Date('2020-04-03'), lty=3, col='gray')
+}
+
+all.state.mods <-
+  lapply(states.test,inla.func )
+  
+par(mfrow=c(4,5), mar=c(2,4,1,1))
+lapply(all.state.mods, plot.func.inla.rr)
+
+```
+reporting delay by state and weeks since death
+```{r, fig.width=5, fig.height=5}
+fe.inla <- sapply(all.state.mods, function(x)  x$fixed.effect[c('time.report1','time.report2','time.report3','time.report4'),c('0.5quant')])
+
+dimnames(fe.inla)[[2]] <- states.test
+matplot(round(100*exp(fe.inla)), type='l', bty='l', ylab='Percent complete', xlab='Weeks since death')
+abline(h=1)
+```
+
+simple glm
+```{r}
+library(lme4)
+glmer.func <- function(state.select){
+  ny1 <- compare.m[compare.m$state ==state.select ,]
+  ny1 <- ny1[!is.na(ny1$death_date),]
+  ny1$death_date.fac <- as.factor(ny1$death_date)
+  time.dummies <- model.matrix(~ time.report, data=ny1)
+  ny1 <- cbind.data.frame(ny1, time.dummies[,-1])
+  
+  form1 <- 
+    as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 + (1|death_date.fac)")
+  mod1 <- mgcv::gam(form1, family='poisson',
+     data=ny1)
+              #examine the regular summary 
+ # summary(dat.inla)
+  results1<-list('input.data'=ny1,'mod1'=mod1 )
+return(results1)
+}
+
+states.test <- c('Alabama','Arizona','Arkansas','Colorado', 'District of Columbia', 'Florida','Georgia','Idaho','Illinois','Indiana','Kansas','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','Montana','Nevada','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Washington')
+
+glmer.mods <- lapply(states.test, glmer.func)
+
+fix.effs<-as.data.frame(sapply(glmer.mods, function(x) fixef(x$mod1)))
+names(fix.effs) <- states.test
+fix.effs <- fix.effs[c('time.report1','time.report2','time.report3','time.report4'),]
+```
+
+```{r, fig.width=5, fig.height=5}
+#If values close to 1, this indicates the value is closer to the final value. the comparison is to 5+ weeks out 
+matplot(exp(fix.effs), type='l', xlab='Weeks since death', bty='l')
+abline(h=1, lty=2, col='gray')
 ```
 
