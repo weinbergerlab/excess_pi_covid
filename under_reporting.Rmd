@@ -23,6 +23,8 @@ library(pdftools)
 library(readr)
 library(gsubfn)
 library(INLA)
+library (RCurl)
+
 
 ```
 ## Backfilling
@@ -220,6 +222,11 @@ return(results1)
 
 states.test <- c('Alabama','Arizona','Arkansas','Colorado', 'District of Columbia', 'Florida','Georgia','Idaho','Illinois','Indiana','Kansas','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','Montana','Nevada','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Washington')
 
+all.state.mods <-
+  lapply(states.test,inla.func )
+```
+
+```{r rr_fill_plot}
 #plot the RR
 plot.func.inla.rr <- function(inla.ds){
   dat.inla <- inla.ds$dat.inla
@@ -265,9 +272,42 @@ plot.func.inla.rr <- function(inla.ds){
     abline(v=as.Date('2020-04-03'), lty=3, col='gray')
 }
 
-all.state.mods <-
-  lapply(states.test,inla.func )
+par(mfrow=c(4,5), mar=c(2,4,1,1))
+lapply(all.state.mods, plot.func.inla.rr)
+
+```
+
+
+```{r fitted_fill_plot}
+#plot the RR
+plot.func.inla.obs.exp <- function(inla.ds){
+  dat.inla <- inla.ds$dat.inla
+  ny1 <- inla.ds$input.data
+  state.select <- unique(ny1$state)
+  rand <-
+    cbind.data.frame('death_date'=unique(ny1$death_date),dat.inla$summary.random)
   
+  pred.combined <- cbind.data.frame(dat.inla$summary.fitted.values, ny1)
+  
+  pred.combined <- pred.combined[order(pred.combined$state, pred.combined$death_date),]
+  
+  pred.combined %>% tidyr::fill('N_new_reports')
+  
+  pred.sub <-pred.combined[pred.combined$death_date >= as.Date('2020-01-01') & pred.combined$time.report=='5' ,]
+  y.range1 <- range(c(pred.sub$`0.975quant`, pred.sub$`0.025quant`, 0))
+  plot(pred.sub$death_date , pred.sub$mean,ylim=y.range1, col='white', main=state.select, bty='l')
+   polygon(c(pred.sub$death_date,
+              rev(pred.sub$death_date)),
+            c(pred.sub$`0.025quant`,
+              rev(pred.sub$`0.975quant`)),
+              col = rgb(1, 0, 0, alpha = 0.1),
+            border = NA
+              )
+   points(pred.sub$death_date,pred.sub$N_new_reports)
+  
+     abline(v=as.Date('2020-04-03'), lty=3, col='gray')
+}
+
 par(mfrow=c(4,5), mar=c(2,4,1,1))
 lapply(all.state.mods, plot.func.inla.rr)
 
@@ -276,11 +316,20 @@ lapply(all.state.mods, plot.func.inla.rr)
 reporting delay by state and weeks since death
 ```{r, fig.width=5, fig.height=5}
 fe.inla <- sapply(all.state.mods, function(x)  x$fixed.effect[c('time.report1','time.report2','time.report3','time.report4'),c('0.5quant')])
-
 dimnames(fe.inla)[[2]] <- states.test
+
+fe.inla.sd <- sapply(all.state.mods, function(x)  x$fixed.effect[c('time.report1','time.report2','time.report3','time.report4'),c('sd')])
+dimnames(fe.inla.sd)[[2]] <- states.test
+
+write.csv(exp(fe.inla),'./outputs/report.proportion.state.csv')
+write.csv(fe.inla.sd,'./outputs/report.proportion.state.SD.csv')
+
+
 matplot(round(100*exp(fe.inla)), type='l', bty='l', ylab='Percent complete', xlab='Weeks since death')
 abline(h=1)
 ```
+
+
 
 simple glm
 ```{r}
@@ -294,7 +343,7 @@ glmer.func <- function(state.select){
   
   form1 <- 
     as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 + (1|death_date.fac)")
-  mod1 <- mgcv::gam(form1, family='poisson',
+  mod1 <- glmer(form1, family='poisson',
      data=ny1)
               #examine the regular summary 
  # summary(dat.inla)
@@ -317,3 +366,97 @@ Underreporting by state
 matplot(exp(fix.effs), type='l', xlab='Weeks since death', bty='l')
 abline(h=1, lty=2, col='gray')
 ```
+
+#Compare inla and glm
+```{r}
+plot( fe.inla, as.matrix(fix.effs))
+```
+
+## Scrape old data from NCHS
+```{r, eval=F}
+
+week.pad <-sprintf("%02d", c(1:52))
+for(i in week.pad){
+ for( j in c('2019-2020','2018-2019','2017-2018','2016-2017')){
+download.file(paste0('https://www.cdc.gov/flu/weekly/weeklyarchives', j,'/data/NCHSData',i,'.csv'),paste0('./Data/provisional_pi/provisional', j,'_','week_',i,'.csv'))
+  }
+}
+```
+
+```{r}
+week.test <- 15
+
+provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
+                      function(x){
+  d1 <- read.csv(paste0('./Data/provisional_pi/provisional', x,'_','week_',week.test,'.csv'))
+  d1$provision.week <- week.test
+  d1$provision.year<-x
+  return(d1)
+                        }
+)
+
+provis.data <- do.call('rbind.data.frame', provis.list)
+provis.data$epiwk <- NA
+
+provis.data$epiwk[provis.data$Week<=26] <-
+  provis.data$Week[provis.data$Week<=26]+26
+
+provis.data$epiwk[provis.data$Week>=27] <-
+  provis.data$Week[provis.data$Week>=27]-26
+
+provis.data$epiyr <- provis.data$Year
+
+provis.data$epiyr[provis.data$Week<=26] <-
+  provis.data$Year[provis.data$Week<=26] -1
+
+#keep only year that has provisional data
+provis.data <- 
+  provis.data[as.character(provis.data$epiyr) ==
+              substr(provis.data$provision.year,1,4),]
+
+provis.data$pi.deaths <- provis.data$Pneumonia.Deaths +
+  provis.data$Influenza.Deaths
+
+provis.data.m <-  
+  melt(provis.data[,c("All.Deaths",'pi.deaths','epiwk','Week','provision.year')],
+       id.vars=c('epiwk','Week','provision.year'))
+
+provis.data.c1 <- 
+  dcast(provis.data.m, variable+epiwk+Week~provision.year)
+
+provis.data.c1 <- 
+  provis.data.c1[order(provis.data.c1$variable, provis.data.c1$epiwk),]
+
+write.csv(provis.data.c1, './outputs/provisional_deaths_reported_in_wk15.csv')
+
+provis.data.c <-
+  provis.data.c1[complete.cases(provis.data.c1),]
+```
+
+```{r, fig.width=5, fig.height=4}
+all.deaths.provis <-
+  provis.data.c[provis.data.c$variable=='All.Deaths',]
+
+all.deaths.provis$Week <-
+  as.numeric(as.character(all.deaths.provis$Week))
+
+cols1 <-c('#fdcc8a','#fc8d59','#e34a33','#b30000')
+matplot(all.deaths.provis$epiwk ,all.deaths.provis[,-c(1:3)], type='l', bty='l',col=cols1, main='Provisional deaths, reported in week 15', lty=1:4)
+legend('bottomleft',legend=names(all.deaths.provis[,-c(1:3)]),col=cols1, lty=1:4, ncol=2 )
+
+diff <- all.deaths.provis$`2019-2020` -
+  all.deaths.provis$`2018-2019`
+
+all.deaths.provis.eval <-
+  all.deaths.provis[all.deaths.provis$Week >=10 &
+                      all.deaths.provis$Week<=14,]
+eval.sum <- apply(all.deaths.provis.eval[,-c(1:3)],2,sum)
+```
+
+```{r}
+pneu.deaths.provis <-
+  provis.data.c[provis.data.c$variable=='pi.deaths',]
+
+matplot(pneu.deaths.provis$epiwk ,pneu.deaths.provis[,-c(1:3)], type='l', bty='l')
+```
+
