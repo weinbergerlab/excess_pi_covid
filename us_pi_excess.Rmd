@@ -94,7 +94,9 @@ runIfExpired <- function(storeName, f, maxage=hours(24)) {
 ```
 
 ```{r states_to_plot}
-plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','WA' )
+plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','LA' )
+
+exclude.states <- c('WV','CT', 'NC') #no up-to-date number
 ```
 
 ```{r start_date_select}
@@ -254,6 +256,21 @@ cdc.pneu.death <- sapply(cdc.data,'[[', "pneumonia_deaths"   )
 cdc.grp<-sapply(cdc.data,'[[', "group"  )
 cdc.ind<-sapply(cdc.data,'[[', "indicator"  )
 
+cdc.covid.death <-lapply(cdc.covid.death, function(x){ if(is.null(x)){ x<-NA}
+return(x)
+})
+cdc.covid.death <-unlist(cdc.covid.death)
+
+cdc.total.death <-lapply(cdc.total.death, function(x){ if(is.null(x)){ x<-NA}
+return(x)
+})
+cdc.total.death <-unlist(cdc.total.death)
+
+cdc.pneum.and.covid <-lapply(cdc.pneum.and.covid, function(x){ if(is.null(x)){ x<-NA}
+return(x)
+})
+cdc.pneum.and.covid <-unlist(cdc.pneum.and.covid)
+
 cdc.summary <- cbind.data.frame('grp'=cdc.grp,'ind'=cdc.ind,'NCHS Reported COVID-19 Deaths'=cdc.covid.death, 'NCHS Reported COVID-19 Deaths, with pneumonia code'=cdc.pneum.and.covid, 'total deaths'=cdc.total.death, 'week_end'=cdc.end.wk,'pneumonia'=cdc.pneu.death)
 
 cdc.summary.wk <- 
@@ -276,6 +293,7 @@ cdc.summary.state$`NCHS Reported COVID-19 Deaths` <- as.numeric(as.character(cdc
 
 cdc.summary.state$covid.pct.pneum <- cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code`/cdc.summary.state$`NCHS Reported COVID-19 Deaths`
 ```
+
 
 ```{r import_national_pic}
 ## there are 3 sources of national data, each has pluses and minus: 1) NCHS provisional data, which is updated daily and has all deaths and pneumonia deaths and covid deaths but not combined PIC category. this is available since last week of Jan 2) Provisional data from another website on NCHS that is updated weekly and has combined pneumonia/influenza/COVID (PIC) and is avalable since week 40 of 2019 3) The weekly NCHS fluview mortality summary, provides P&I and all cause, but no COVID
@@ -318,7 +336,19 @@ nchs_covidview$`NCHS Reported COVID-19 Deaths` <-
 plot(nchs_covidview$wk_end, nchs_covidview$`total deaths`)
 
 #Also import the latest national fluview data
-natl.all.data <- runIfExpired('PI_mortality_national', ~pi_mortality(coverage_area='national'))
+#natl.all.data <- runIfExpired('PI_mortality_national', #~pi_mortality(coverage_area='national'))
+#NOTE can't use national data as baseline bc missing WV, NC, CT
+pi.data.exclude <- pi.data
+pi.data.exclude$state <-   
+  state.abb[match(pi.data.exclude$region_name, state.name)]
+pi.data.exclude <- 
+  pi.data.exclude[!(pi.data.exclude$state %in% exclude.states),]
+
+natl.all.data <- 
+  aggregate(pi.data.exclude[,c("total_pni", 'all_deaths')],
+            by=list('week_end'=pi.data.exclude$week_end,
+                'year_week_num'=pi.data.exclude$weeknumber ), FUN=sum)
+
 
 natl.all.data$year <- 
   year(natl.all.data$week_end)
@@ -329,22 +359,36 @@ max.wk <-
 wk.range <- c(10,max.wk)
 
 #Replace 2020 data with the NCHS data, which are more up to date
-natl.all.data <- 
-  natl.all.data[natl.all.data$year <=2019,]
+#natl.all.data <- 
+#  natl.all.data[natl.all.data$year <=2019,]
 
 natl.all.data <- 
-  natl.all.data[,c('year','week_end', 'year_week_num',"all_deaths","number_pneumonia","total_pni" )]
+  natl.all.data[,c('year','week_end', 'year_week_num',"all_deaths","total_pni" )]
 
 mmwr.wk1 <- MMWRweek(nchs_covidview$wk_end)
 nchs_covidview$year_week_num <- mmwr.wk1$MMWRweek
 nchs_covidview <- nchs_covidview[,c('wk_end','NCHS Reported COVID-19 Deaths', 'total deaths', 'pneumonia', 'year_week_num')]
 
 names(nchs_covidview) <- 
-  c('week_end','covid19.nchs', 'all_deaths',
+  c('week_end','covid19.nchs', 'all_deaths_covidview',
     'number_pneumonia','year_week_num')
-nchs_covidview$year <- 2020
+nchs_covidview <- 
+  nchs_covidview[,c('week_end', 'covid19.nchs','all_deaths_covidview')]
+#nchs_covidview$year <- 2020
 
-natl.all.data <- bind_rows(natl.all.data,nchs_covidview)
+natl.all.data$year_week_num <-
+  as.numeric(as.character(natl.all.data$year_week_num))
+
+#natl.all.data <- bind_rows(natl.all.data,nchs_covidview)
+
+natl.all.data <-
+  merge(natl.all.data,
+        nchs_covidview[,c('week_end','covid19.nchs','all_deaths_covidview')],
+        by='week_end', all=T)
+
+#Use 'all-death' column from covid view since this is updated daily
+natl.all.data$all_deaths[!is.na(natl.all.data$all_deaths_covidview)] <- 
+  natl.all.data$all_deaths_covidview[!is.na(natl.all.data$all_deaths_covidview)]
 
 natl.all.data <-
   merge(natl.all.data, pic1, by.x=c('year','year_week_num'),by.y=c('year','week') ,all=T)
@@ -361,10 +405,9 @@ natl.all.data.sub <-
                   natl.all.data$year_week_num <=
                   wk.range[2],]
 
-agg.historic <- aggregate(natl.all.data.sub[,c("all_deaths","number_pneumonia","total_pni", 'covid19.nchs')], by=list('year'=natl.all.data.sub$year), FUN=sum)
+agg.historic <- aggregate(natl.all.data.sub[,c("all_deaths","total_pni", 'covid19.nchs')], by=list('year'=natl.all.data.sub$year), FUN=sum)
 
 natl.all.data$state <- 'NATL'
-plot(natl.all.data$week_end, natl.all.data$number_pneumonia, type='l')
 
 natl.all.data <-
   natl.all.data[order(natl.all.data$week_end),]
@@ -540,11 +583,13 @@ There were notable increases in the rate of death due to pneumonia and influenza
 Given the lack of consistent virological testing, tracking spikes in deaths due to non-specific causes provides the most complete estimate of the burden of COVID-19. This approach provides a framework for tracking the progression of the epidemic and its public health impact. 
 
 ## National analysis of P&I
-```{r, include=F}
+```{r natl_pi_analysis, include=F}
 #Run analysis
-natl.all.data$one <- 1
+natl.all.data2$one <- 1
+natl.all.data3 <-
+  natl.all.data2[!is.na(natl.all.data2$total_deaths_pic_denom),]
 excess_ac_natl <-
-  excessCases(ds = natl.all.data2,
+  excessCases(ds = natl.all.data3,
               datevar       = "week_end",
               statevar      = "state",
               adj.flu       = "percent_positive",
@@ -583,37 +628,39 @@ obs <-
                 syndrome = 'pic_deaths',
                 extract.quantity = "y")
 
-plot(natl.all.data2$week_end, natl.all.data2$pic_deaths, type='l')
-points(natl.all.data2$week_end,pred, type='l', col='gray')
+plot(natl.all.data3$week_end, natl.all.data3$pic_deaths, type='l')
+points(natl.all.data3$week_end,pred, type='l', col='gray')
 
-res.ac <-cbind.data.frame('week_end'=natl.all.data2$week_end,
+res.pi1 <-cbind.data.frame('week_end'=natl.all.data3$week_end,
                           'pred'=pred[,1,1], 'upi'=upi[,1,1], 'lpi'=lpi[,1,1],'obs'=obs[,1,1],
                       'unexplained.cases'=unexplained.cases[,1,1])
 
-mmwr.rs <- mmwr_week(res.ac$week_end)
-res.ac<- cbind.data.frame(mmwr.rs, res.ac)
-#plot(res.ac$week_end, res.ac$unexplained.cases)
+mmwr.rs <- mmwr_week(res.pi1$week_end)
+res.pi1<- cbind.data.frame(mmwr.rs, res.pi1)
+#plot(res.pi$week_end, res.pi$unexplained.cases)
 
-res.ac <- res.ac[res.ac$week_end<=as.Date('2020-03-28'),]
-yrange.pneu <- range(c(res.ac$pred, res.ac$obs, res.ac$upi,0))
 
-write.csv(res.ac, './outputs/p_i_natl_obs_expected.csv')
 
-sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 &
-                               res.ac$mmwr_week<=13 & res.ac$week_end>=as.Date('2020-01-01')])
+res.pi <- res.pi1[res.pi1$week_end<=as.Date('2020-04-04'),]
+
+write.csv(res.pi, './outputs/p_i_natl_obs_expected.csv')
+
+sum(res.pi$unexplained.cases[res.pi$mmwr_week>=10 &
+                               res.pi$mmwr_week<=14 & res.pi$week_end>=as.Date('2020-01-01')])
 ```
 
 ```{r natl_pi_plot}
-plot(res.ac$week_end, res.ac$pred, type='l', ylim=yrange.pneu, col='gray', )
+yrange.pneu <- range(c(res.pi$pred, res.pi$obs, res.pi$upi,0))
 
-polygon(c(res.ac$week_end, rev(res.ac$week_end)), c(res.ac$lpi, rev(res.ac$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
+plot(res.pi$week_end, res.pi$pred, type='l', ylim=yrange.pneu, col='gray', )
 
-points(res.ac$week_end, res.ac$obs, type='l', col='red', bty='l')
+polygon(c(res.pi$week_end, rev(res.pi$week_end)), c(res.pi$lpi, rev(res.pi$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
+
+points(res.pi$week_end, res.pi$obs, type='l', col='red', bty='l')
 
 ```
 ## National analysis of all-cause 
 
-## National analysis of P&I
 ```{r, include=F}
 #Run analysis
 natl.all.data2$one <- 365000000/100000
@@ -660,33 +707,50 @@ obs <-
 plot(natl.all.data2$week_end, natl.all.data2$all_deaths, type='l')
 points(natl.all.data2$week_end,pred, type='l', col='gray')
 
-res.ac <-cbind.data.frame('week_end'=natl.all.data2$week_end,
+res.ac1 <-cbind.data.frame('week_end'=natl.all.data2$week_end,
                           'pred'=pred[,1,1], 'upi'=upi[,1,1], 'lpi'=lpi[,1,1],'obs'=obs[,1,1],
                       'unexplained.cases'=unexplained.cases[,1,1])
 
-mmwr.rs <- mmwr_week(res.ac$week_end)
-res.ac<- cbind.data.frame(mmwr.rs, res.ac)
+mmwr.rs <- mmwr_week(res.ac1$week_end)
+res.ac1<- cbind.data.frame(mmwr.rs, res.ac1)
 #plot(res.ac$week_end, res.ac$unexplained.cases)
 
-res.ac <- res.ac[res.ac$week_end<=as.Date('2020-03-28'),]
+res.ac <- res.ac1[res.ac1$week_end<=as.Date('2020-04-04'),]
+
 yrange.pneu <- range(c(res.ac$pred, res.ac$obs, res.ac$upi,0))
 
-sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=13 & res.ac$week_end>=as.Date('2020-01-01')])
+sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=14 & res.ac$week_end>=as.Date('2020-01-01')])
 
 ```
 
 ```{r plot_ac_natl}
 plot(res.ac$week_end, res.ac$pred, type='l', ylim=yrange.pneu, col='gray')
 
-polygon(c(res.ac$week_end, rev(res.ac$week_end)), c(res.ac$lpi, rev(res.ac$upi)),col = rgb(1, 1, 1, alpha = 0.1), border = NA )
+polygon(c(res.ac$week_end, rev(res.ac$week_end)), c(res.ac$lpi, rev(res.ac$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
 
 points(res.ac$week_end, res.ac$obs, type='l', col='red', bty='l')
 ```
 
+```{r summary_table_natl}
+res.pi2 <- res.pi1
+names(res.pi2) <-
+  c('year','week','day','week_end_date','baseline_pi','baseline_pi_upper', 'baseline_pi_lower', 'pneumonia_influenza_covid','excess_pneumonia_influenza_covid')
+
+res.ac2 <- res.ac1
+names(res.ac2) <-
+  c('year','week','day','week_end_date','baseline_all_cause','baseline_all_cause_upper', 'baseline_all-cause_lower', 'all_cause_deaths','excess_all_cause_deaths')
+
+comb1 <- merge(res.ac2, res.pi2,
+               by=c('year','week','day','week_end_date'))
+
+comb2 <- merge(comb1,
+               natl.all.data2[,c('week_end','covid19.nchs')],by.x='week_end_date', by.y='week_end')
+
+write.csv(comb2,'./outputs/national_summary.csv' )
+```
 
 
-
-```{r, include=F}
+```{r pi_analysis_state, include=F}
 #Run analysis
 excess_deaths1.adjusted <-
   excessCases(ds = pi.data.clean2,
@@ -1256,6 +1320,7 @@ excess_deaths1.ac <-
 ```{r}
 ds <- excess_deaths1.ac
 syndrome.select <- 'all_deaths'
+
 excess_deaths.ac <- excessExtract(ds = excess_deaths1.ac,
                 syndrome = 'all_deaths',
                 extract.quantity = "unexplained.cases")
@@ -1300,6 +1365,48 @@ pred.ac<-  excessExtract(ds = excess_deaths1.ac,
 rr.ac <-  excessExtract(ds = excess_deaths1.ac,
                 syndrome = syndrome.select,
                 extract.quantity = "resid1")
+
+```
+
+```{r summary_table_state_ac}
+lpi.ac.long <- melt(lpi.ac[,,1])
+names(lpi.ac.long) <- c('index','state','lpi.ac')
+
+upi.ac.long <- melt(upi.ac[,,1])
+names(upi.ac.long) <- c('index','state','upi.ac')
+
+pred.ac.long <- melt(lpi.ac[,,1])
+names(pred.ac.long) <- c('index','state','pred.ac')
+
+obs.ac.long <- melt(obs.ac[,,1])
+names(obs.ac.long) <- c('index','state','obs.ac')
+
+excess_deaths.ac.long <-
+  melt(excess_deaths.ac[,,1])
+
+
+dates1.ac.long <- rep(dates1.ac, times=ncol(lpi.ac))
+
+mmwr.dates.ac <- MMWRweek(dates1.ac.long)
+names(mmwr.dates.ac) <- c('year', 'week', 'day')
+ac.summary.state <-
+  cbind.data.frame(mmwr.dates.ac,
+                   'week_end_date'=dates1.ac.long,
+                   'state'=pred.ac.long[,2],
+                   'baseline'=pred.ac.long[,3],
+                   "baseline_all-cause_lower"=lpi.ac.long[,3], "baseline_all_cause_upper"=upi.ac.long[,3],
+                   "all_cause_deaths"=obs.ac.long[,3], 
+                   "excess_all_cause_deaths"=excess_deaths.ac.long[,3]
+                                    )
+jh3a <- jh3
+jh3a$week_end <- jh3a$date 
+jh3a <- jh3a[,c('state','week_end','total_pi',"excess_pi","covid.track.death","test.week.per.capita",'testN' )]
+ac.summary.state2 <- merge(ac.summary.state, jh3a,by.x=c('state','week_end_date'), by.y=c('state', 'week_end'))
+
+ac.summary.state2$week_end_date <-
+  ac.summary.state2$week_end_date+6
+write.csv(ac.summary.state2,'./outputs/state.ac.summary.csv')
+
 
 ```
 
