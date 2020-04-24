@@ -16,7 +16,7 @@ output:
     keep_tex:  true
 params:
   agg.level: 'state_region'
-  n.days.filter: 13
+  n.days.filter: 20
 ---
 
 ```{r, include = F}
@@ -125,9 +125,13 @@ last.date.obtained <-
  pi.data <- pi.data[pi.data$week_end <=
                       (last.date.obtained-params$n.days.filter),]
 
-pi.data.miss.states <- unique(pi.data.last$region_name[is.na(pi.data.last$total_pni)])
+#pi.data.miss.states <- unique(pi.data.last$region_name[is.na(pi.data.last$total_pni)])
+ 
+#pi.data.miss.states <- unique(pi.data.last$region_name)
 
-pi.data.not.miss.states <- unique(pi.data.last$region_name[!is.na(pi.data.last$total_pni)])
+pi.data.not.miss.states <- unique(pi.data.last$region_name)
+
+#pi.data.not.miss.states <- unique(pi.data.last$region_name[!is.na(pi.data.last$total_pni)])
 
 pi.data.not.miss.states <- state.abb[match(pi.data.not.miss.states, state.name)]
 
@@ -756,7 +760,7 @@ write.csv(comb2,'./outputs/national_summary.csv' )
 ```{r pi_analysis_state, include=F}
 #Run analysis
 excess_deaths1.adjusted <-
-  excessCases(ds = pi.data.clean2,
+  excessCases(ds = pi.data.clean2[!(pi.data.clean2$state %in% exclude.states),],
               datevar       = "week_start",
               statevar      = "state",
               denom.var     = "all_deaths",
@@ -1452,10 +1456,10 @@ ac.summary.state3 <-
 
 write.csv(ac.summary.state3,'./outputs/state.summary.csv')
 
-end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14,]
+end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14 & ac.summary.state3$state %in% c('FL','LA','MI','NJ','NY','NYC','PA', 'MA', 'CA', 'IL'),]
 
 agg.est <- 
-  aggregate(end.summary[,c('excess_pi_deaths',"excess_all_cause_deaths","all_cause_deaths")], by=list('state'=end.summary$state), FUN=sum)
+  aggregate(end.summary[,c('excess_pi_deaths',"excess_all_cause_deaths","all_cause_deaths",'covid.track.death')], by=list('state'=end.summary$state), FUN=sum) 
 
 ```
 
