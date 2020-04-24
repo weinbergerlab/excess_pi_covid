@@ -57,6 +57,8 @@ library(readr)
 library(gsubfn)
 library(dplyr)
 library(RCurl)
+#library(jsonlite)
+
 source('./functions/ts_plot_func.R')
 ```
 
@@ -96,7 +98,7 @@ runIfExpired <- function(storeName, f, maxage=hours(24)) {
 ```{r states_to_plot}
 plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','LA' )
 
-exclude.states <- c('WV','CT', 'NC') #no up-to-date number
+exclude.states <- c('CT', 'NC') #no up-to-date number
 ```
 
 ```{r start_date_select}
@@ -1450,6 +1452,10 @@ ac.summary.state3 <-
 
 write.csv(ac.summary.state3,'./outputs/state.summary.csv')
 
+end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14,]
+
+agg.est <- 
+  aggregate(end.summary[,c('excess_pi_deaths',"excess_all_cause_deaths","all_cause_deaths")], by=list('state'=end.summary$state), FUN=sum)
 
 ```
 
