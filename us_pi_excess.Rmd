@@ -838,6 +838,40 @@ states <- dimnames(pred)[[2]]
 ages <- dimnames(pred)[[3]]
 ```
 
+```{r summary_table_pi_state}
+lpi.long <- melt(lpi[,,1])
+names(lpi.long) <- c('index','state','lpi')
+
+upi.long <- melt(upi[,,1])
+names(upi.long) <- c('index','state','upi')
+
+pred.long <- melt(lpi[,,1])
+names(pred.long) <- c('index','state','pred')
+
+obs.long <- melt(obs[,,1])
+names(obs.long) <- c('index','state','obs')
+
+excess_deaths.long <-
+  melt(excess_deaths[,,1])
+
+
+dates1.long <- rep(dates1, times=ncol(lpi))
+
+mmwr.dates <- MMWRweek(dates1.long)
+names(mmwr.dates) <- c('year', 'week', 'day')
+pi.summary.state <-
+  cbind.data.frame(mmwr.dates,
+                   'week_end_date'=dates1.long+6,
+                   'state'=pred.long[,2],
+                   'baseline_pi'=pred.long[,3],
+                   "baseline_pi_lower"=lpi.long[,3], "baseline_pi_upper"=upi.long[,3],
+                   "pi_deaths"=obs.long[,3], 
+                   "excess_pi_deaths"=excess_deaths.long[,3]
+                                    )
+
+```
+
+
 ## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
  The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
 
@@ -1391,21 +1425,29 @@ mmwr.dates.ac <- MMWRweek(dates1.ac.long)
 names(mmwr.dates.ac) <- c('year', 'week', 'day')
 ac.summary.state <-
   cbind.data.frame(mmwr.dates.ac,
-                   'week_end_date'=dates1.ac.long,
+                   'week_end_date'=dates1.ac.long+6,
                    'state'=pred.ac.long[,2],
                    'baseline'=pred.ac.long[,3],
                    "baseline_all-cause_lower"=lpi.ac.long[,3], "baseline_all_cause_upper"=upi.ac.long[,3],
                    "all_cause_deaths"=obs.ac.long[,3], 
-                   "excess_all_cause_deaths"=excess_deaths.ac.long[,3]
-                                    )
-jh3a <- jh3
-jh3a$week_end <- jh3a$date 
-jh3a <- jh3a[,c('state','week_end','total_pi',"excess_pi","covid.track.death","test.week.per.capita",'testN' )]
-ac.summary.state2 <- merge(ac.summary.state, jh3a,by.x=c('state','week_end_date'), by.y=c('state', 'week_end'))
+                   "excess_all_cause_deaths"=excess_deaths.ac.long[,3])
 
-ac.summary.state2$week_end_date <-
-  ac.summary.state2$week_end_date+6
-write.csv(ac.summary.state2,'./outputs/state.ac.summary.csv')
+ac.summary.state$week_start_date <-
+  ac.summary.state$week_end_date-6
+                                                    
+jh3a <- jh3
+jh3a$week_start <- jh3a$date 
+jh3a <- jh3a[,c('state','week_start','total_pi',"excess_pi","covid.track.death","test.week.per.capita",'testN' )]
+
+ac.summary.state2 <- merge(ac.summary.state, jh3a,by.x=c('state','week_start_date'), by.y=c('state', 'week_start'), all=T)
+
+ac.summary.state2$week_start_date <- NULL
+
+ac.summary.state3 <- 
+  merge(ac.summary.state2,pi.summary.state ,
+        by=c('year','week','day','state','week_end_date'), all=T)
+
+write.csv(ac.summary.state3,'./outputs/state.summary.csv')
 
 
 ```
