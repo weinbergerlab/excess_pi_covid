@@ -659,6 +659,7 @@ polygon(c(res.pi$week_end, rev(res.pi$week_end)), c(res.pi$lpi, rev(res.pi$upi))
 points(res.pi$week_end, res.pi$obs, type='l', col='red', bty='l')
 
 ```
+
 ## National analysis of all-cause 
 
 ```{r, include=F}
