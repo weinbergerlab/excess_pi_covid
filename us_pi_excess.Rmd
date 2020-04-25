@@ -760,10 +760,10 @@ sum.ac.excess <-
 sum.excess.deaths.range.ac <-
   quantile(sum.ac.excess[,1,1], probs=c(0.025,0.5,0.975))
 
-plot(natl.all.data2$week_end, natl.all.data2$all_deaths, type='l')
-points(natl.all.data2$week_end,pred, type='l', col='gray')
+plot(natl.all.data3$week_end, natl.all.data3$all_deaths, type='l')
+points(natl.all.data3$week_end,pred, type='l', col='gray')
 
-res.ac1 <-cbind.data.frame('week_end'=natl.all.data2$week_end,
+res.ac1 <-cbind.data.frame('week_end'=natl.all.data3$week_end,
                           'pred'=pred[,1,1], 'upi'=upi[,1,1], 'lpi'=lpi[,1,1],'obs'=obs[,1,1],
                       'unexplained.cases'=unexplained.cases[,1,1])
 
