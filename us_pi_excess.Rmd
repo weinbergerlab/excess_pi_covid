@@ -1465,7 +1465,7 @@ ac.summary.state3 <-
   merge(ac.summary.state2,pi.summary.state ,
         by=c('year','week','day','state','week_end_date'), all=T)
 
-write.csv(ac.summary.state3,'./outputs/state.summary.STATES.csv')
+write.csv(ac.summary.state3,'./outputs/state.summary.csv')
 
 end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14 ,]
 
