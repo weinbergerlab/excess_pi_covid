@@ -116,14 +116,16 @@ count.start.date <- as.Date('2020-01-26')
 #ARCHIVE
 pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
 
-pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) &pi.data$geo_description=='State',]
+pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) & pi.data$geo_description=='State',]
 
 last.date.avail.pi <- 
   max(pi.data$week_end)
 last.date.obtained <- 
   last.date.avail.pi +6 #release date fr latest data (if            weekly)
- pi.data <- pi.data[pi.data$week_end <=
-                      (last.date.obtained-params$n.days.filter),]
+
+ pi.data <- pi.data[pi.data$week_end <=                     (last.date.obtained-params$n.days.filter),]
+ 
+  pi.data <- pi.data[!(is.na(pi.data$week_end)),]
 
 #pi.data.miss.states <- unique(pi.data.last$region_name[is.na(pi.data.last$total_pni)])
  
@@ -174,6 +176,11 @@ hhs_states.cw <- hhs_states[!is.na(hhs_states$state),]
 #Get rid of states that have no data in recent time points
 hhs_states.cw <- 
   hhs_states.cw[ hhs_states.cw$state %in% pi.data.not.miss.states,]
+
+#Exclude CT
+hhs_states.cw <- 
+  hhs_states.cw[ !(hhs_states.cw$state %in% exclude.states),]
+
 
 if(params$agg.level== 'state_region'){
 hhs_states.cw.spl <- split(hhs_states.cw, 
@@ -527,7 +534,10 @@ clin4.lags <- merge(clin4.lags, clin4.lag2, by=c('state','wk_date'))
 pi.data$percent_complete[pi.data$percent_complete > 1] <- 1
 
 pi.data$state <- state.abb[match(pi.data$region_name, state.name)]
+
 pi.data$state[pi.data$region_name == 'New York City'] <- 'NYC'
+
+pi.data <- pi.data[!(pi.data$state %in% exclude.states),]
 
 pi.data <- merge(pi.data,hhs_states.cw, by='state', all=T)
 pi.data$state_region[pi.data$state=='NYC'] <- 'NYC'
@@ -1345,12 +1355,13 @@ pi.data.clean.ny <- merge(pi.data.clean.ny,clin4, by.x=c('state.merge', 'week_st
 pi.data.clean.ny$one <- 1
 pi.data.clean.ny$percent_complete.adj <-pi.data.clean.ny$percent_complete - 0.5 #subtract =0.5 because 0.5 is added in code
 
+pi.data.clean.ny$one <- 1000
 
 excess_deaths1.ac <-
   excessCases(ds = pi.data.clean.ny,
               datevar       = "week_start",
               statevar      = "state",
-              denom.var     = "percent_complete.adj",
+              denom.var     = "one",
               adj.flu       = "flu_pct_adj",
               #covs=c("flu_pct_adj", "flu_pct_adj_lag1", "flu_pct_adj_lag2"),
               use.syndromes = c("all_deaths"),
@@ -1444,7 +1455,7 @@ ac.summary.state$week_start_date <-
                                                     
 jh3a <- jh3
 jh3a$week_start <- jh3a$date 
-jh3a <- jh3a[,c('state','week_start','total_pi',"excess_pi","covid.track.death","test.week.per.capita",'testN' )]
+jh3a <- jh3a[,c('state','week_start',"covid.track.death","test.week.per.capita",'testN' )]
 
 ac.summary.state2 <- merge(ac.summary.state, jh3a,by.x=c('state','week_start_date'), by.y=c('state', 'week_start'), all=T)
 
@@ -1454,13 +1465,14 @@ ac.summary.state3 <-
   merge(ac.summary.state2,pi.summary.state ,
         by=c('year','week','day','state','week_end_date'), all=T)
 
-write.csv(ac.summary.state3,'./outputs/state.summary.csv')
+write.csv(ac.summary.state3,'./outputs/state.summary.STATES.csv')
 
-end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14 & ac.summary.state3$state %in% c('FL','LA','MI','NJ','NY','NYC','PA', 'MA', 'CA', 'IL'),]
+end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14 ,]
 
 agg.est <- 
   aggregate(end.summary[,c('excess_pi_deaths',"excess_all_cause_deaths","all_cause_deaths",'covid.track.death')], by=list('state'=end.summary$state), FUN=sum) 
-
+agg.est$ratio <-
+  agg.est$excess_all_cause_deaths/agg.est$covid.track.death
 ```
 
 ```{r}
@@ -1486,7 +1498,7 @@ select.indices <- which(dates1.ac >= as.Date('2009-04-01'))
 
 for(i in plot.state.indices){
   for(j in 1:dim(pred.ac)[3]){
-    y.range1<-range(c( pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j], upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j],0))
+    y.range1<-range(c( pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j], upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j]))
   plot(dates1.ac,
        pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
        type='l',
