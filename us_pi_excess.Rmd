@@ -96,7 +96,7 @@ runIfExpired <- function(storeName, f, maxage=hours(24)) {
 ```
 
 ```{r states_to_plot}
-plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','LA' )
+plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','LA', 'MA' )
 
 exclude.states <- c('CT', 'NC') #no up-to-date number
 ```
