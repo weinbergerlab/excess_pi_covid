@@ -96,7 +96,7 @@ runIfExpired <- function(storeName, f, maxage=hours(24)) {
 ```
 
 ```{r states_to_plot}
-plot.states <- c('CA','TX','FL', 'NY','PA','IL','OH','GA','MI','LA', 'MA' )
+plot.states <- c('CA','TX','FL', 'NY','PA','IL','GA','MI','LA', 'MA' )
 
 exclude.states <- c('CT', 'NC') #no up-to-date number
 ```
@@ -603,7 +603,7 @@ Given the lack of consistent virological testing, tracking spikes in deaths due 
 #Run analysis
 natl.all.data2$one <- 1
 natl.all.data3 <-
-  natl.all.data2[!is.na(natl.all.data2$total_deaths_pic_denom),]
+  natl.all.data2[!is.na(natl.all.data2$pic_deaths),]
 excess_ac_natl <-
   excessCases(ds = natl.all.data3,
               datevar       = "week_end",
@@ -611,7 +611,7 @@ excess_ac_natl <-
               adj.flu       = "percent_positive",
               denom.var     = 'total_deaths_pic_denom',
               use.syndromes = c("pic_deaths"),
-              extrapolation.date = '2020-01-26',
+              extrapolation.date = '2020-03-01',
               model.type='negbin',
               time.res='week')
 ds <- excess_ac_natl
@@ -643,6 +643,22 @@ obs <-
    excessExtract(ds = ds,
                 syndrome = 'pic_deaths',
                 extract.quantity = "y")
+
+sum.pred.iter <-    
+  excessExtract(ds = ds,
+                syndrome = 'pic_deaths',
+                extract.quantity = "sum.pred.iter")
+
+sum.obs <-
+    excessExtract(ds = ds,
+                syndrome = 'pic_deaths',
+                extract.quantity = "sum.obs")
+
+sum.cases.excess <- 
+  sum(sum.obs) - sum.pred.iter
+
+sum.excess.deaths.range.pi <-
+  quantile(sum.cases.excess[,1,1], probs=c(0.025,0.5,0.975))
 
 plot(natl.all.data3$week_end, natl.all.data3$pic_deaths, type='l')
 points(natl.all.data3$week_end,pred, type='l', col='gray')
@@ -665,6 +681,11 @@ sum(res.pi$unexplained.cases[res.pi$mmwr_week>=10 &
                                res.pi$mmwr_week<=14 & res.pi$week_end>=as.Date('2020-01-01')])
 ```
 
+Excess deaths due to pneumonia/influenza/covid nationally in the specified time period
+```{r}
+print(sum.excess.deaths.range.pi)
+```
+
 ```{r natl_pi_plot}
 yrange.pneu <- range(c(res.pi$pred, res.pi$obs, res.pi$upi,0))
 
@@ -681,14 +702,16 @@ points(res.pi$week_end, res.pi$obs, type='l', col='red', bty='l')
 ```{r, include=F}
 #Run analysis
 natl.all.data2$one <- 365000000/100000
+natl.all.data3 <-
+    natl.all.data2[!is.na(natl.all.data2$total_pni),]
 excess_ac_natl <-
-  excessCases(ds = natl.all.data2,
+  excessCases(ds = natl.all.data3,
               datevar       = "week_end",
               statevar      = "state",
               adj.flu       = "percent_positive",
               denom.var     = 'one',
               use.syndromes = c("all_deaths"),
-              extrapolation.date = '2020-01-26',
+              extrapolation.date = '2020-03-01',
               model.type='negbin',
               time.res='week')
 ds <- excess_ac_natl
@@ -721,6 +744,22 @@ obs <-
                 syndrome = 'all_deaths',
                 extract.quantity = "y")
 
+sum.obs.ac <-
+    excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "sum.obs")
+
+sum.pred.iter.ac <-    
+  excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "sum.pred.iter")
+
+sum.ac.excess <- 
+  sum(sum.obs.ac) - sum.pred.iter.ac
+
+sum.excess.deaths.range.ac <-
+  quantile(sum.ac.excess[,1,1], probs=c(0.025,0.5,0.975))
+
 plot(natl.all.data2$week_end, natl.all.data2$all_deaths, type='l')
 points(natl.all.data2$week_end,pred, type='l', col='gray')
 
@@ -739,6 +778,12 @@ yrange.pneu <- range(c(res.ac$pred, res.ac$obs, res.ac$upi,0))
 sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=14 & res.ac$week_end>=as.Date('2020-01-01')])
 
 ```
+
+Total excess all cause deaths
+```{r}
+print(sum.excess.deaths.range.ac)
+```
+
 
 ```{r plot_ac_natl}
 plot(res.ac$week_end, res.ac$pred, type='l', ylim=yrange.pneu, col='gray')
