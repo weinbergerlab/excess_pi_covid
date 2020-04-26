@@ -702,12 +702,12 @@ points(res.pi$week_end, res.pi$obs, type='l', col='red', bty='l')
 ## National analysis of all-cause 
 
 ```{r, include=F}
-set.seed(12345)
 
 #Run analysis
 natl.all.data2$one <- 365000000/100000
 natl.all.data3 <-
     natl.all.data2[!is.na(natl.all.data2$total_pni),]
+
 set.seed(123)
 excess_ac_natl <-
   excessCases(ds = natl.all.data3,
@@ -787,6 +787,14 @@ sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=14 & res.a
 Total excess all cause deaths
 ```{r}
 print(sum.excess.deaths.range.ac)
+
+mean(sum.ac.excess>13000 & sum.ac.excess<17000)
+mean(sum.ac.excess>12000 & sum.ac.excess<18000)
+mean(sum.ac.excess>11000 & sum.ac.excess<19000)
+mean(sum.ac.excess>10000 & sum.ac.excess<20000)
+
+mean(sum.ac.excess>12000)
+
 ```
 
 
@@ -1480,7 +1488,7 @@ names(lpi.ac.long) <- c('index','state','lpi.ac')
 upi.ac.long <- melt(upi.ac[,,1])
 names(upi.ac.long) <- c('index','state','upi.ac')
 
-pred.ac.long <- melt(lpi.ac[,,1])
+pred.ac.long <- melt(pred.ac[,,1])
 names(pred.ac.long) <- c('index','state','pred.ac')
 
 obs.ac.long <- melt(obs.ac[,,1])
