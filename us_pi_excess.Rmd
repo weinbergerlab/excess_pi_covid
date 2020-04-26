@@ -15,7 +15,7 @@ output:
   pdf_document: 
     keep_tex:  true
 params:
-  agg.level: 'state_region'
+  agg.level: 'state'
   n.days.filter: 20
 ---
 
@@ -58,7 +58,7 @@ library(gsubfn)
 library(dplyr)
 library(RCurl)
 #library(jsonlite)
-
+set.seed(123)
 source('./functions/ts_plot_func.R')
 ```
 
@@ -234,7 +234,8 @@ test.ds$test.date.wk <-floor_date(as.Date(test.ds$test.dates, '%Y%m%d'),'week')
 test.ds <- merge(test.ds, hhs_states.cw, by='state')
 
 
-test.ds.agg <- aggregate( test.ds[,c('testN.day','deathN.day')] , by=list('state'=test.ds$state_region,'date'=test.ds$test.date.wk), FUN=sum)
+test.ds.agg <- aggregate( test.ds[,c('testN.day','deathN.day')] , by=list('state'=test.ds$state_region,'date'=test.ds$test.date.wk), FUN=sum, na.rm=T)
+
 names(test.ds.agg) <- c('state','date','testN','deathN')
 
 pop1<-read.csv('./Data/nst-est2019-01.csv')
@@ -604,6 +605,7 @@ Given the lack of consistent virological testing, tracking spikes in deaths due 
 natl.all.data2$one <- 1
 natl.all.data3 <-
   natl.all.data2[!is.na(natl.all.data2$pic_deaths),]
+set.seed(123)
 excess_ac_natl <-
   excessCases(ds = natl.all.data3,
               datevar       = "week_end",
@@ -700,10 +702,13 @@ points(res.pi$week_end, res.pi$obs, type='l', col='red', bty='l')
 ## National analysis of all-cause 
 
 ```{r, include=F}
+set.seed(12345)
+
 #Run analysis
 natl.all.data2$one <- 365000000/100000
 natl.all.data3 <-
     natl.all.data2[!is.na(natl.all.data2$total_pni),]
+set.seed(123)
 excess_ac_natl <-
   excessCases(ds = natl.all.data3,
               datevar       = "week_end",
@@ -814,6 +819,7 @@ write.csv(comb2,'./outputs/national_summary.csv' )
 
 ```{r pi_analysis_state, include=F}
 #Run analysis
+set.seed(123)
 excess_deaths1.adjusted <-
   excessCases(ds = pi.data.clean2[!(pi.data.clean2$state %in% exclude.states),],
               datevar       = "week_start",
@@ -1193,6 +1199,7 @@ ili.data2.agg <- aggregate(ili.data2[,c('ilitotal','total_patients')], by=list('
 
 ili.data2.agg <- merge(ili.data2.agg, clin4.lags, by.x=c('state','week_start'), by.y=c('state', 'wk_date'))
 
+set.seed(123)
 excess_cases1 <-
   excessCases(ds = ili.data2.agg,
               datevar       = "week_start", 
@@ -1402,6 +1409,7 @@ pi.data.clean.ny$percent_complete.adj <-pi.data.clean.ny$percent_complete - 0.5 
 
 pi.data.clean.ny$one <- 1000
 
+set.seed(123)
 excess_deaths1.ac <-
   excessCases(ds = pi.data.clean.ny,
               datevar       = "week_start",
@@ -1659,6 +1667,8 @@ excess_all_cause[dim(excess_all_cause)[1],'NJ',1]/excess_pi[dim(excess_pi)[1],'N
 ```{r nyc}
 nyc.data <- pi.data.clean.ny[pi.data.clean.ny$state=='NYC',]
 nyc.data$one <- 1
+
+set.seed(123)
 nyc.pi <-
   excessCases(ds = nyc.data,
               datevar       = "week_start",
@@ -1668,6 +1678,7 @@ nyc.pi <-
               use.syndromes = c("total_pni"),
               extrapolation.date = '2020-01-26',
               time.res='week')
+set.seed(123)
 nyc.acm <-
   excessCases(ds = nyc.data,
               datevar       = "week_start",
@@ -1755,6 +1766,7 @@ htmlTable(count.excess3, caption=paste0('Table S3. Observed and Excess deaths du
 
 ```{r, include=F} 
 #Run analysis 
+set.seed(123)
 excess_deaths1.unadjusted <-
   excessCases(ds = pi.data.clean2,
               datevar       = "week_start",
