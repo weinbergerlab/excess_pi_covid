@@ -154,6 +154,8 @@ pi.data.not.miss.states <-
 
 ```
 
+
+
 ```{r import_state_adjustments}
 #State-level adjustments for under-reporting
 adj <- read.csv('./outputs/report.proportion.state.csv')
@@ -329,7 +331,7 @@ nchs_covidview <- cdc.summary.wk
 #https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/04172020/nchs-mortality-report.html
 
 
-pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=4)
+pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=5)
 pic1<- pic1[-1,]
 pic1 <- apply(pic1,2, function(x) 
   gsub(',','',x))
@@ -371,6 +373,7 @@ natl.all.data <-
             by=list('week_end'=pi.data.exclude$week_end,
                 'year_week_num'=pi.data.exclude$weeknumber ), FUN=sum)
 
+natl.all.data.set <- natl.all.data
 
 natl.all.data$year <- 
   year(natl.all.data$week_end)
@@ -394,6 +397,7 @@ nchs_covidview <- nchs_covidview[,c('wk_end','NCHS Reported COVID-19 Deaths', 't
 names(nchs_covidview) <- 
   c('week_end','covid19.nchs', 'all_deaths_covidview',
     'number_pneumonia','year_week_num')
+
 nchs_covidview <- 
   nchs_covidview[,c('week_end', 'covid19.nchs','all_deaths_covidview')]
 #nchs_covidview$year <- 2020
@@ -443,6 +447,70 @@ nrevvs.natl$week_end <- nrevvs.natl$wk_date+6
 
 natl.all.data2 <- merge( natl.all.data, nrevvs.natl, by.x='week_end', by.y='week_end')
 ```
+
+```{r check.stata.data.agg}
+#Run some reality checks on the data
+natl.all.data.set$year <- 
+  year(natl.all.data.set$week_end)
+
+natl.all.data.set$year_week_num <- as.numeric(as.character(natl.all.data.set$year_week_num))
+
+natl.all.data.set$epiyear <- 
+  natl.all.data.set$year
+
+natl.all.data.set$epiyear[natl.all.data.set$year_week_num <= 26] <- 
+  natl.all.data.set$epiyear[natl.all.data.set$year_week_num <= 26] -1
+
+nat.m <- melt(natl.all.data.set[,c("all_deaths",'epiyear','year_week_num')], id.vars=c('epiyear','year_week_num'))
+nat.c <- dcast( nat.m, year_week_num~epiyear, fun.aggregate = sum)
+
+nat.c <- nat.c[,c('year_week_num','2015','2016','2017','2018','2019')]
+
+cols1<- c(rep('gray',4),'red')
+matplot(nat.c[nat.c$year_week_num<=14,-1], type='l', col=cols1, bty='l', ylab='N deaths')
+
+#nat.c$ave.hist <- (nat.c$`2016`+nat.c$`2017`+nat.c$`2018`)/3
+
+diffs <-nat.c
+diffs$diff2018 <- diffs$`2019` - diffs$`2018`
+diffs$diff2017 <- diffs$`2019` - diffs$`2017`
+diffs$diff2016 <- diffs$`2019` - diffs$`2016`
+diffs$diff2015 <- diffs$`2019` - diffs$`2015`
+diffs <- diffs[diffs$year_week_num<=14,]
+plot(diffs$year_week_num, diffs$diff2015, type='l', col='gray', ylim=c(-5000, 8000), bty='l', ylab='Difference between 2020 and previous 4 years')
+points(diffs$year_week_num, diffs$diff2016, type='l', col='gray')
+points(diffs$year_week_num, diffs$diff2017, type='l', col='gray')
+points(diffs$year_week_num, diffs$diff2018, type='l', col='gray')
+abline(h=0, lty=2)
+
+
+nat.c.epiwk <- nat.c
+nat.c.epiwk$epiwk.num <- nat.c.epiwk$year_week_num
+nat.c.epiwk$epiwk.num[nat.c.epiwk$year_week_num<=26] <- 
+nat.c.epiwk$year_week_num[nat.c.epiwk$year_week_num<=26]+26
+nat.c.epiwk$epiwk.num[nat.c.epiwk$year_week_num>26] <- 
+nat.c.epiwk$year_week_num[nat.c.epiwk$year_week_num>26]-26
+nat.c.epiwk <- nat.c.epiwk[nat.c.epiwk$year_week_num<=52,]
+#matplot(nat.c.epiwk$epiwk.num, nat.c.epiwk[,3:6], type='l')
+
+diffs.epiwk <-nat.c.epiwk
+diffs.epiwk$`2019`[diffs.epiwk$`2019`==0] <- NA
+diffs.epiwk$diff2018 <- diffs.epiwk$`2019` -
+  diffs.epiwk$`2018`
+diffs.epiwk$diff2017 <- diffs.epiwk$`2019` -
+  diffs.epiwk$`2017`
+diffs.epiwk$diff2016 <- diffs.epiwk$`2019` -
+  diffs.epiwk$`2016`
+diffs.epiwk$diff2015 <- diffs.epiwk$`2019` -
+  diffs.epiwk$`2015`
+#diffs.epiwk <- diffs.epiwk[diffs.epiwk$year_week_num<=14,]
+plot(diffs.epiwk$epiwk.num, diffs.epiwk$diff2018, type='l',ylim=c(-5000, 8000), main='2019/20 minus prev. years', xaxt='n')
+axis(side=1, at=diffs.epiwk$epiwk[c(1,5,9,13,17,21,24,28,32,36,40,44,48,52)], labels=diffs.epiwk$year_week_num[c(1,5,9,13,17,21,24,28,32,36,40,44,48,52)])
+points(diffs.epiwk$epiwk.num, diffs.epiwk$diff2017, type='l')
+points(diffs.epiwk$epiwk.num, diffs.epiwk$diff2016, type='l')
+abline(h=0)
+```
+
 
 
 ```{r}
