@@ -95,6 +95,17 @@ runIfExpired <- function(storeName, f, maxage=hours(24)) {
 }
 ```
 
+```{r}
+#Download latest PIC data--pulls from most recent Friday
+
+days.sub <- wday(Sys.Date() + 1)
+days.sub[days.sub==7] <- 0
+last.fri <- as.character(Sys.Date() - days.sub)
+
+fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
+download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
+```
+
 ```{r states_to_plot}
 plot.states <- c('CA','TX','FL', 'NY','PA','IL','GA','MI','LA', 'MA' )
 
@@ -317,9 +328,6 @@ nchs_covidview <- cdc.summary.wk
 #starting 2019 wk 40, CDC provide combined PIC national
 #https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/04172020/nchs-mortality-report.html
 
-#CAUTION: THE PIC data seem to be less complete than the fluview data (even looking at total deaths)
- download.file('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/04172020/csv/nchs-mortality-report.csv','./Data/pic_provisional/pic.provisional.txt')
- 
 
 pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=4)
 pic1<- pic1[-1,]
