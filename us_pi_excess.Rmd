@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
-date: "4/17/2020"
+date: "5/1/2020"
 output:
   html_document:
     df_print: paged
@@ -773,11 +773,11 @@ sum(res.pi$unexplained.cases[res.pi$mmwr_week>=10 &
 ```
 
 Excess deaths due to pneumonia/influenza/covid nationally in the specified time period
-```{r}
+```{r, eval= !params$web.version}
 print(sum.excess.deaths.range.pi)
 ```
 
-```{r natl_pi_plot}
+```{r natl_pi_plot, eval= !params$web.version}
 yrange.pneu <- range(c(res.pi$pred, res.pi$obs, res.pi$upi,0))
 
 plot(res.pi$week_end, res.pi$pred, type='l', ylim=yrange.pneu, col='gray', )
@@ -875,16 +875,23 @@ sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=15 & res.a
 
 Total excess all cause deaths
 ```{r}
-print(sum.excess.deaths.range.ac)
+#print(sum.excess.deaths.range.ac)
 
-mean(sum.ac.excess>13000 & sum.ac.excess<17000)
-mean(sum.ac.excess>12000 & sum.ac.excess<18000)
-mean(sum.ac.excess>11000 & sum.ac.excess<19000)
-mean(sum.ac.excess>10000 & sum.ac.excess<20000)
+formatted.ac <- 
+  paste0(round(sum.excess.deaths.range.ac[2],-2),
+                      '(' ,
+                      round(sum.excess.deaths.range.ac[1],-2),',',
+                      round(sum.excess.deaths.range.ac[3],-2), ')'
+                      )
+#mean(sum.ac.excess>13000 & sum.ac.excess<17000)
+#mean(sum.ac.excess>12000 & sum.ac.excess<18000)
+#mean(sum.ac.excess>11000 & sum.ac.excess<19000)
+#mean(sum.ac.excess>10000 & sum.ac.excess<20000)
 
-mean(sum.ac.excess>12000)
+#mean(sum.ac.excess>12000)
 
 ```
+`r if(!params$web.version){print(formatted.ac)}`
 
 
 ```{r plot_ac_natl}
