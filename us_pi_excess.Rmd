@@ -74,7 +74,7 @@ source('./functions/ts_plot_func.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(24)) {
+runIfExpired <- function(storeName, f, maxage=hours(2)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -102,8 +102,11 @@ days.sub <- wday(Sys.Date() + 1)
 days.sub[days.sub==7] <- 0
 last.fri <- as.character(Sys.Date() - days.sub)
 
-fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
-download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
+# fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
+# download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
+
+fri.dat <-"04172020"
+ # download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
 ```
 
 ```{r states_to_plot}
@@ -467,7 +470,7 @@ nat.c <- dcast( nat.m, year_week_num~epiyear, fun.aggregate = sum)
 nat.c <- nat.c[,c('year_week_num','2015','2016','2017','2018','2019')]
 
 cols1<- c(rep('gray',4),'red')
-matplot(nat.c[nat.c$year_week_num<=14,-1], type='l', col=cols1, bty='l', ylab='N deaths')
+matplot(nat.c[nat.c$year_week_num<=15,-1], type='l', col=cols1, bty='l', ylab='N deaths')
 
 #nat.c$ave.hist <- (nat.c$`2016`+nat.c$`2017`+nat.c$`2018`)/3
 
@@ -476,7 +479,7 @@ diffs$diff2018 <- diffs$`2019` - diffs$`2018`
 diffs$diff2017 <- diffs$`2019` - diffs$`2017`
 diffs$diff2016 <- diffs$`2019` - diffs$`2016`
 diffs$diff2015 <- diffs$`2019` - diffs$`2015`
-diffs <- diffs[diffs$year_week_num<=14,]
+diffs <- diffs[diffs$year_week_num<=15,]
 plot(diffs$year_week_num, diffs$diff2015, type='l', col='gray', ylim=c(-5000, 8000), bty='l', ylab='Difference between 2020 and previous 4 years')
 points(diffs$year_week_num, diffs$diff2016, type='l', col='gray')
 points(diffs$year_week_num, diffs$diff2017, type='l', col='gray')
@@ -503,7 +506,7 @@ diffs.epiwk$diff2016 <- diffs.epiwk$`2019` -
   diffs.epiwk$`2016`
 diffs.epiwk$diff2015 <- diffs.epiwk$`2019` -
   diffs.epiwk$`2015`
-#diffs.epiwk <- diffs.epiwk[diffs.epiwk$year_week_num<=14,]
+#diffs.epiwk <- diffs.epiwk[diffs.epiwk$year_week_num<=15,]
 plot(diffs.epiwk$epiwk.num, diffs.epiwk$diff2018, type='l',ylim=c(-5000, 8000), main='2019/20 minus prev. years', xaxt='n')
 axis(side=1, at=diffs.epiwk$epiwk[c(1,5,9,13,17,21,24,28,32,36,40,44,48,52)], labels=diffs.epiwk$year_week_num[c(1,5,9,13,17,21,24,28,32,36,40,44,48,52)])
 points(diffs.epiwk$epiwk.num, diffs.epiwk$diff2017, type='l')
@@ -751,12 +754,12 @@ res.pi1<- cbind.data.frame(mmwr.rs, res.pi1)
 
 
 
-res.pi <- res.pi1[res.pi1$week_end<=as.Date('2020-04-04'),]
+res.pi <- res.pi1[res.pi1$week_end<=as.Date('2020-04-11'),]
 
 write.csv(res.pi, './outputs/p_i_natl_obs_expected.csv')
 
 sum(res.pi$unexplained.cases[res.pi$mmwr_week>=10 &
-                               res.pi$mmwr_week<=14 & res.pi$week_end>=as.Date('2020-01-01')])
+                               res.pi$mmwr_week<=15 & res.pi$week_end>=as.Date('2020-01-01')])
 ```
 
 Excess deaths due to pneumonia/influenza/covid nationally in the specified time period
@@ -852,11 +855,11 @@ mmwr.rs <- mmwr_week(res.ac1$week_end)
 res.ac1<- cbind.data.frame(mmwr.rs, res.ac1)
 #plot(res.ac$week_end, res.ac$unexplained.cases)
 
-res.ac <- res.ac1[res.ac1$week_end<=as.Date('2020-04-04'),]
+res.ac <- res.ac1[res.ac1$week_end<=as.Date('2020-04-11'),]
 
 yrange.pneu <- range(c(res.ac$pred, res.ac$obs, res.ac$upi,0))
 
-sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=14 & res.ac$week_end>=as.Date('2020-01-01')])
+sum(res.ac$unexplained.cases[res.ac$mmwr_week>=10 & res.ac$mmwr_week<=15 & res.ac$week_end>=as.Date('2020-01-01')])
 
 ```
 
@@ -1604,7 +1607,7 @@ ac.summary.state3 <-
 
 write.csv(ac.summary.state3,'./outputs/state.summary.csv')
 
-end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=14 ,]
+end.summary <- ac.summary.state3[ac.summary.state3$year==2020 & ac.summary.state3$week>=10 & ac.summary.state3$week<=15 ,]
 
 agg.est <- 
   aggregate(end.summary[,c('excess_pi_deaths',"excess_all_cause_deaths","all_cause_deaths",'covid.track.death')], by=list('state'=end.summary$state), FUN=sum) 
@@ -1635,9 +1638,9 @@ select.indices <- which(dates1.ac >= as.Date('2009-04-01'))
 
 for(i in plot.state.indices){
   for(j in 1:dim(pred.ac)[3]){
-    y.range1<-range(c( pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j], upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j]))
+    y.range1<-range(c( pred.ac[select.indices,i,j],obs.ac[select.indices,i,j], upi.ac[select.indices,i,j]))
   plot(dates1.ac,
-       pred.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
+       pred.ac[select.indices,i,j],
        type='l',
        col='red',
        ylim=y.range1,
@@ -1647,14 +1650,14 @@ for(i in plot.state.indices){
   )
 
   points(dates1.ac,
-         obs.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
+         obs.ac[select.indices,i,j],
          type='l',
          col='black')
 
   polygon(c(dates1.ac,
             rev(dates1.ac)),
-          c(lpi.ac[select.indices,i,j]/denom.ac[select.indices,i,j],
-            rev(upi.ac[select.indices,i,j]/denom.ac[select.indices,i,j])),
+          c(lpi.ac[select.indices,i,j],
+            rev(upi.ac[select.indices,i,j])),
           col = rgb(1, 0, 0, alpha = 0.1),
           border = NA)
   }
