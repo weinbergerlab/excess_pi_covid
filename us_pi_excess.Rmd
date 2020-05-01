@@ -344,7 +344,7 @@ nchs_covidview <- cdc.summary.wk
 #https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/04172020/nchs-mortality-report.html
 
 
-pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=5)
+pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=4)
 pic1<- pic1[-1,]
 pic1 <- apply(pic1,2, function(x) 
   gsub(',','',x))
