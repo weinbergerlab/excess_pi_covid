@@ -17,6 +17,7 @@ output:
 params:
   agg.level: 'state'
   n.days.filter: 20
+  web.version: TRUE
 ---
 
 ```{r, include = F}
@@ -102,11 +103,20 @@ days.sub <- wday(Sys.Date() + 1)
 days.sub[days.sub==7] <- 0
 last.fri <- as.character(Sys.Date() - days.sub)
 
-# fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
-# download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
+ fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
+ 
+ url1 <- paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv')
+ 
+if(url.exists(url1)){
+ download.file(url1,'./Data/pic_provisional/pic.provisional.txt')
+}else{
+  fri.dat2 <-"04172020"
+  url2 <- paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.dat2, '/csv/nchs-mortality-report.csv')
+   download.file(url2,'./Data/pic_provisional/pic.provisional.txt')
 
-fri.dat <-"04172020"
- # download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
+}
+  
+
 ```
 
 ```{r states_to_plot}
