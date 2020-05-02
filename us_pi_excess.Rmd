@@ -15,9 +15,9 @@ output:
   pdf_document: 
     keep_tex:  true
 params:
-  agg.level: 'state'
+  agg.level: 'state_region'
   n.days.filter: 20
-  web.version: TRUE
+  web.version: FALSE
 ---
 
 ```{r, include = F}
@@ -283,55 +283,37 @@ test.ds3.spl <- test.ds2
 
 ```{r import_cdc_covid_view}
 #official CDC data
-url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json" 
-
+#url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json" #no longer being updated as of Apr 30
+url.cdc.covid <- "https://data.cdc.gov/resource/r8kw-7aab.json"
 #ARCHIVE
-cdc.data <- runIfExpired('cdc_covid_data', ~fromJSON(file=url.cdc.covid, simplify=F))
-cdc.pneum.and.covid <- sapply(cdc.data,'[[', "pneumonia_and_covid_deaths"  )
-cdc.total.death <- sapply(cdc.data, '[[', 'total_deaths')
-cdc.covid.death <- sapply(cdc.data,'[[', "covid_deaths"  )
-cdc.end.wk <- sapply(cdc.data,'[[', "end_week"  )
-cdc.pneu.death <- sapply(cdc.data,'[[', "pneumonia_deaths"   )
+cdc.data <- runIfExpired('cdc_covid_data', 
+ ~jsonlite::read_json(url.cdc.covid, simplifyVector = T),maxage=hours(24))
 
-cdc.grp<-sapply(cdc.data,'[[', "group"  )
-cdc.ind<-sapply(cdc.data,'[[', "indicator"  )
+names(cdc.data) <- 
+  c('data_as_of','start_week', 'end_week', 'group', 'state','indicator','nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')
 
-cdc.covid.death <-lapply(cdc.covid.death, function(x){ if(is.null(x)){ x<-NA}
-return(x)
-})
-cdc.covid.death <-unlist(cdc.covid.death)
+cdc.data$start_week <-
+  as.Date(substr(cdc.data$start_week,1,10))
 
-cdc.total.death <-lapply(cdc.total.death, function(x){ if(is.null(x)){ x<-NA}
-return(x)
-})
-cdc.total.death <-unlist(cdc.total.death)
+cdc.data$end_week <-
+  as.Date(substr(cdc.data$end_week,1,10))
 
-cdc.pneum.and.covid <-lapply(cdc.pneum.and.covid, function(x){ if(is.null(x)){ x<-NA}
-return(x)
-})
-cdc.pneum.and.covid <-unlist(cdc.pneum.and.covid)
+#Convert character to numeric
+cdc.data[,c('nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')] <- apply(cdc.data[,c('nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')],2, as.numeric)
 
-cdc.summary <- cbind.data.frame('grp'=cdc.grp,'ind'=cdc.ind,'NCHS Reported COVID-19 Deaths'=cdc.covid.death, 'NCHS Reported COVID-19 Deaths, with pneumonia code'=cdc.pneum.and.covid, 'total deaths'=cdc.total.death, 'week_end'=cdc.end.wk,'pneumonia'=cdc.pneu.death)
+cdc.summary.nat <-
+  cdc.data[cdc.data$state=='United States',]
 
-cdc.summary.wk <- 
-  cdc.summary[cdc.summary$grp=='By week',]
+cdc.summary.nat$state <- NULL
 
-cdc.summary.wk$wk_end <- 
-  as.Date(substr(cdc.summary.wk$week_end,1,10), "%Y-%m-%d")
+cdc.summary.wk <- cdc.summary.nat
 
-cdc.summary.wk <-
-  cdc.summary.wk[!is.na(cdc.summary.wk$wk_end),]
+cdc.summary.wk <- cdc.summary.wk[, c("start_week", 'end_week' ,'nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')]
 
-cdc.summary.wk <- cdc.summary.wk[, c('wk_end', 'NCHS Reported COVID-19 Deaths','NCHS Reported COVID-19 Deaths, with pneumonia code','total deaths','pneumonia')]
+cdc.summary.state <-
+  cdc.data[cdc.data$state!='United States',]
 
 
-cdc.summary.state <- cdc.summary[cdc.summary$grp=='By state',]
-
-cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code` <- as.numeric(as.character(cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code`))
-
-cdc.summary.state$`NCHS Reported COVID-19 Deaths` <- as.numeric(as.character(cdc.summary.state$`NCHS Reported COVID-19 Deaths` ))
-
-cdc.summary.state$covid.pct.pneum <- cdc.summary.state$`NCHS Reported COVID-19 Deaths, with pneumonia code`/cdc.summary.state$`NCHS Reported COVID-19 Deaths`
 ```
 
 
@@ -358,19 +340,10 @@ pic1 <- pic1[,c("Year", "Week","Total.Deaths","Pneumonia..Influenza.or.COVID.19.
 names(pic1) <- c('year', 'week', 'total_deaths_pic_denom','pic_deaths')
 
 nchs_covidview <- 
-  nchs_covidview[cdc.summary.wk$wk_end < 
-                   max(cdc.summary.wk$wk_end),]
+  nchs_covidview[cdc.summary.wk$end_week < 
+                   max(cdc.summary.wk$end_week),]
 
-nchs_covidview$`total deaths` <-
-  as.numeric(as.character(nchs_covidview$`total deaths`))
-
-nchs_covidview$`pneumonia` <-
-  as.numeric(as.character(nchs_covidview$`pneumonia`))
-
-nchs_covidview$`NCHS Reported COVID-19 Deaths` <-
-  as.numeric(as.character(nchs_covidview$`NCHS Reported COVID-19 Deaths`))
-
-plot(nchs_covidview$wk_end, nchs_covidview$`total deaths`)
+plot(nchs_covidview$end_week, nchs_covidview$nchs.total.deaths)
 
 #Also import the latest national fluview data
 #natl.all.data <- runIfExpired('PI_mortality_national', #~pi_mortality(coverage_area='national'))
@@ -396,16 +369,12 @@ max.wk <-
 
 wk.range <- c(10,max.wk)
 
-#Replace 2020 data with the NCHS data, which are more up to date
-#natl.all.data <- 
-#  natl.all.data[natl.all.data$year <=2019,]
-
 natl.all.data <- 
   natl.all.data[,c('year','week_end', 'year_week_num',"all_deaths","total_pni" )]
 
-mmwr.wk1 <- MMWRweek(nchs_covidview$wk_end)
+mmwr.wk1 <- MMWRweek(nchs_covidview$end_week)
 nchs_covidview$year_week_num <- mmwr.wk1$MMWRweek
-nchs_covidview <- nchs_covidview[,c('wk_end','NCHS Reported COVID-19 Deaths', 'total deaths', 'pneumonia', 'year_week_num')]
+nchs_covidview <- nchs_covidview[,c('end_week',"nchs.covid.deaths", "nchs.total.deaths" ,  "nchs.pneu.death" , 'year_week_num')]
 
 names(nchs_covidview) <- 
   c('week_end','covid19.nchs', 'all_deaths_covidview',
@@ -883,12 +852,15 @@ formatted.ac <-
                       round(sum.excess.deaths.range.ac[1],-2),',',
                       round(sum.excess.deaths.range.ac[3],-2), ')'
                       )
-#mean(sum.ac.excess>13000 & sum.ac.excess<17000)
-#mean(sum.ac.excess>12000 & sum.ac.excess<18000)
-#mean(sum.ac.excess>11000 & sum.ac.excess<19000)
-#mean(sum.ac.excess>10000 & sum.ac.excess<20000)
+mean(sum.ac.excess>13000 & sum.ac.excess<17000)
+mean(sum.ac.excess>12000 & sum.ac.excess<18000)
+mean(sum.ac.excess>11000 & sum.ac.excess<19000)
+mean(sum.ac.excess>10000 & sum.ac.excess<20000)
 
-#mean(sum.ac.excess>12000)
+mean(sum.ac.excess>33000)
+mean(sum.ac.excess>33000)
+
+quantile(sum.ac.excess, probs=c(0.025,0.1, 0.30, 0.5, 0.9, 0.7, 0.975))
 
 ```
 `r if(!params$web.version){print(formatted.ac)}`
@@ -1170,7 +1142,7 @@ htmlTable(cumsum_excess_deaths_national)
 
 
 ## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by the Johns Hopkins CSEE), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
+The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by covidtracking.com), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
 
 ```{r}
 excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
