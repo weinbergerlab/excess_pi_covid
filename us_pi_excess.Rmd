@@ -852,13 +852,6 @@ formatted.ac <-
                       round(sum.excess.deaths.range.ac[1],-2),',',
                       round(sum.excess.deaths.range.ac[3],-2), ')'
                       )
-mean(sum.ac.excess>13000 & sum.ac.excess<17000)
-mean(sum.ac.excess>12000 & sum.ac.excess<18000)
-mean(sum.ac.excess>11000 & sum.ac.excess<19000)
-mean(sum.ac.excess>10000 & sum.ac.excess<20000)
-
-mean(sum.ac.excess>33000)
-mean(sum.ac.excess>33000)
 
 quantile(sum.ac.excess, probs=c(0.025,0.1, 0.30, 0.5, 0.9, 0.7, 0.975))
 
