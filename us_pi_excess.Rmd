@@ -75,7 +75,7 @@ source('./functions/ts_plot_func.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(2)) {
+runIfExpired <- function(storeName, f, maxage=hours(24)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -98,24 +98,24 @@ runIfExpired <- function(storeName, f, maxage=hours(2)) {
 
 ```{r}
 #Download latest PIC data--pulls from most recent Friday
-
-days.sub <- wday(Sys.Date() + 1)
-days.sub[days.sub==7] <- 0
-last.fri <- as.character(Sys.Date() - days.sub)
-
- fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
- 
- url1 <- paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv')
- 
-if(url.exists(url1)){
- download.file(url1,'./Data/pic_provisional/pic.provisional.txt')
-}else{
-  fri.dat2 <-"04172020"
-  url2 <- paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.dat2, '/csv/nchs-mortality-report.csv')
-   download.file(url2,'./Data/pic_provisional/pic.provisional.txt')
-
-}
-  
+# 
+# days.sub <- wday(Sys.Date() + 1)
+# days.sub[days.sub==7] <- 0
+# last.fri <- as.character(Sys.Date() - days.sub)
+# 
+#  fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
+#  
+#  url1 <- paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv')
+#  
+# if(url.exists(url1)){
+#  download.file(url1,'./Data/pic_provisional/pic.provisional.txt')
+# }else{
+#   fri.dat2 <-"04172020"
+#   url2 <- paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.dat2, '/csv/nchs-mortality-report.csv')
+#    download.file(url2,'./Data/pic_provisional/pic.provisional.txt')
+# 
+# }
+#   
 
 ```
 
@@ -326,18 +326,18 @@ nchs_covidview <- cdc.summary.wk
 #https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/04172020/nchs-mortality-report.html
 
 
-pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=4)
-pic1<- pic1[-1,]
-pic1 <- apply(pic1,2, function(x) 
-  gsub(',','',x))
-
-pic1 <- apply(pic1,2, function(x) 
-  as.numeric(as.character(x))) 
-
-pic1 <- as.data.frame(pic1)
-
-pic1 <- pic1[,c("Year", "Week","Total.Deaths","Pneumonia..Influenza.or.COVID.19.Deaths")]
-names(pic1) <- c('year', 'week', 'total_deaths_pic_denom','pic_deaths')
+# pic1 <- read.csv('./Data/pic_provisional/pic.provisional.txt', skip=4)
+# pic1<- pic1[-1,]
+# pic1 <- apply(pic1,2, function(x) 
+#   gsub(',','',x))
+# 
+# pic1 <- apply(pic1,2, function(x) 
+#   as.numeric(as.character(x))) 
+# 
+# pic1 <- as.data.frame(pic1)
+# 
+# pic1 <- pic1[,c("Year", "Week","Total.Deaths","Pneumonia..Influenza.or.COVID.19.Deaths")]
+# names(pic1) <- c('year', 'week', 'total_deaths_pic_denom','pic_deaths')
 
 nchs_covidview <- 
   nchs_covidview[cdc.summary.wk$end_week < 
@@ -374,14 +374,14 @@ natl.all.data <-
 
 mmwr.wk1 <- MMWRweek(nchs_covidview$end_week)
 nchs_covidview$year_week_num <- mmwr.wk1$MMWRweek
-nchs_covidview <- nchs_covidview[,c('end_week',"nchs.covid.deaths", "nchs.total.deaths" ,  "nchs.pneu.death" , 'year_week_num')]
+#nchs_covidview <- nchs_covidview[,c('end_week',"nchs.covid.deaths", "nchs.total.deaths" ,  "nchs.pneu.death" , 'year_week_num')]
 
-names(nchs_covidview) <- 
-  c('week_end','covid19.nchs', 'all_deaths_covidview',
-    'number_pneumonia','year_week_num')
+# names(nchs_covidview) <- 
+#   c('week_end','covid19.nchs', 'all_deaths_covidview',
+#     'number_pneumonia','year_week_num')
 
-nchs_covidview <- 
-  nchs_covidview[,c('week_end', 'covid19.nchs','all_deaths_covidview')]
+# nchs_covidview <- 
+#   nchs_covidview[,c('week_end', 'covid19.nchs','all_deaths_covidview')]
 #nchs_covidview$year <- 2020
 
 natl.all.data$year_week_num <-
@@ -389,23 +389,27 @@ natl.all.data$year_week_num <-
 
 #natl.all.data <- bind_rows(natl.all.data,nchs_covidview)
 
+nchs_covidview$year_week_num <- NULL
+
+nchs_covidview$start_week <- NULL
+
 natl.all.data <-
   merge(natl.all.data,
-        nchs_covidview[,c('week_end','covid19.nchs','all_deaths_covidview')],
-        by='week_end', all=T)
+        nchs_covidview,
+        by.x='week_end', by.y='end_week',all=T)
 
 #Use 'all-death' column from covid view since this is updated daily
-natl.all.data$all_deaths[!is.na(natl.all.data$all_deaths_covidview)] <- 
-  natl.all.data$all_deaths_covidview[!is.na(natl.all.data$all_deaths_covidview)]
+natl.all.data$all_deaths[!is.na(natl.all.data$nchs.total.deaths)] <- 
+  natl.all.data$nchs.total.deaths[!is.na(natl.all.data$nchs.total.deaths)]
 
-natl.all.data <-
-  merge(natl.all.data, pic1, by.x=c('year','year_week_num'),by.y=c('year','week') ,all=T)
+# natl.all.data <-
+#   merge(natl.all.data, pic1, by.x=c('year','year_week_num'),by.y=c('year','week') ,all=T)
 
-natl.all.data$pic_deaths[is.na(natl.all.data$pic_deaths)] <-
-  natl.all.data$total_pni[is.na(natl.all.data$pic_deaths)]
+natl.all.data$nchs.pic[is.na(natl.all.data$nchs.pic)] <-
+  natl.all.data$total_pni[is.na(natl.all.data$nchs.pic)]
 
-natl.all.data$total_deaths_pic_denom[is.na(natl.all.data$total_deaths_pic_denom)] <-
-  natl.all.data$all_deaths[is.na(natl.all.data$total_deaths_pic_denom)]
+natl.all.data$nchs.total.deaths[is.na(natl.all.data$nchs.total.deaths)] <-
+  natl.all.data$all_deaths[is.na(natl.all.data$nchs.total.deaths)]
 
 
 natl.all.data.sub <-
@@ -413,7 +417,7 @@ natl.all.data.sub <-
                   natl.all.data$year_week_num <=
                   wk.range[2],]
 
-agg.historic <- aggregate(natl.all.data.sub[,c("all_deaths","total_pni", 'covid19.nchs')], by=list('year'=natl.all.data.sub$year), FUN=sum)
+agg.historic <- aggregate(natl.all.data.sub[,c("all_deaths","total_pni", "nchs.covid.deaths")], by=list('year'=natl.all.data.sub$year), FUN=sum)
 
 natl.all.data$state <- 'NATL'
 
@@ -486,7 +490,7 @@ diffs.epiwk$diff2016 <- diffs.epiwk$`2019` -
 diffs.epiwk$diff2015 <- diffs.epiwk$`2019` -
   diffs.epiwk$`2015`
 #diffs.epiwk <- diffs.epiwk[diffs.epiwk$year_week_num<=15,]
-plot(diffs.epiwk$epiwk.num, diffs.epiwk$diff2018, type='l',ylim=c(-5000, 8000), main='2019/20 minus prev. years', xaxt='n')
+plot(diffs.epiwk$epiwk.num, diffs.epiwk$diff2018, type='l',ylim=c(-5000, 15000), main='2019/20 minus prev. years', xaxt='n')
 axis(side=1, at=diffs.epiwk$epiwk[c(1,5,9,13,17,21,24,28,32,36,40,44,48,52)], labels=diffs.epiwk$year_week_num[c(1,5,9,13,17,21,24,28,32,36,40,44,48,52)])
 points(diffs.epiwk$epiwk.num, diffs.epiwk$diff2017, type='l')
 points(diffs.epiwk$epiwk.num, diffs.epiwk$diff2016, type='l')
@@ -662,15 +666,15 @@ Given the lack of consistent virological testing, tracking spikes in deaths due 
 #Run analysis
 natl.all.data2$one <- 1
 natl.all.data3 <-
-  natl.all.data2[!is.na(natl.all.data2$pic_deaths),]
+    natl.all.data2[!is.na(natl.all.data2$total_pni),]
 set.seed(123)
 excess_ac_natl <-
   excessCases(ds = natl.all.data3,
               datevar       = "week_end",
               statevar      = "state",
               adj.flu       = "percent_positive",
-              denom.var     = 'total_deaths_pic_denom',
-              use.syndromes = c("pic_deaths"),
+              denom.var     = "nchs.total.deaths",
+              use.syndromes = c("nchs.pic"),
               extrapolation.date = '2020-03-01',
               model.type='negbin',
               time.res='week')
@@ -681,37 +685,37 @@ dates1 <-
   
 unexplained.cases <-
   excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "unexplained.cases")
 
 pred <- 
    excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "pred")
 
 upi <- 
    excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "upi")
 
 lpi <- 
    excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "lpi")
 
 obs <- 
    excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "y")
 
 sum.pred.iter <-    
   excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "sum.pred.iter")
 
 sum.obs <-
     excessExtract(ds = ds,
-                syndrome = 'pic_deaths',
+                syndrome = 'nchs.pic',
                 extract.quantity = "sum.obs")
 
 sum.cases.excess <- 
@@ -730,8 +734,6 @@ res.pi1 <-cbind.data.frame('week_end'=natl.all.data3$week_end,
 mmwr.rs <- mmwr_week(res.pi1$week_end)
 res.pi1<- cbind.data.frame(mmwr.rs, res.pi1)
 #plot(res.pi$week_end, res.pi$unexplained.cases)
-
-
 
 res.pi <- res.pi1[res.pi1$week_end<=as.Date('2020-04-11'),]
 
