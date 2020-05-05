@@ -1017,7 +1017,6 @@ dates.ili <-
 rr.ili <-  excessExtract(ds = excess_cases1,
                 syndrome = "ilitotal",
                 extract.quantity = "resid1")
-rr2.ili <- rr.ili[,,1]
 
 date.mmwrdates.ili <- mmwr_week(dates.ili)
 mmwr.epiyr.ili<- date.mmwrdates.ili$mmwr_year
@@ -1026,31 +1025,41 @@ mmwr.epiyr.ili[date.mmwrdates.ili$mmwr_week<=26] <- mmwr.epiyr.ili[date.mmwrdate
 mmwr.epiwk.ili <- date.mmwrdates.ili$mmwr_week
 mmwr.epiwk.ili[date.mmwrdates.ili$mmwr_week>=27]<-date.mmwrdates.ili$mmwr_week[date.mmwrdates.ili$mmwr_week>=27] - 52
 mmwr.epiwk.ili <- mmwr.epiwk.ili +26
+
+rr.ili2 <- rr.ili[mmwr.epiyr.ili==2019,,1]
 ```
 
-```{r fig4, fig.width=7.3, fig.height=7}
-common.states <- intersect(colnames(rr2), colnames(rr2.ili) )
+```{r}
+rr.state.pic <- t(comb2.c[,,'2019','rr.pic'])
+rr.state.ac <- t(comb2.c[,,'2019','rr.ac'])
 
-# states.cdc.order <- c(common.states[common.states %in% state.abb],
-#                       common.states[!(common.states %in% state.abb)]) 
-# plot.state.indices <- match( states.cdc.order,common.states  )
-rr.common.states <- rr[,common.states,1]
+```
+
+
+```{r fig4, fig.width=7.3, fig.height=7}
+common.states <- 
+  intersect(colnames(rr.state.pic), colnames(rr2.ili) )
+
+n.nonmiss <- sum(!is.na(rr.common.states[,1]))
+rr.common.states <- rr.state.pic[,common.states]
 rr2.comp <-rr.common.states
-rr2.ili.comp <- rr.ili[,common.states,]
-plot.state.rank <- cbind.data.frame(state.index=1:dim(rr.common.states)[2],state.rank= rank(-rr.common.states[dim(rr.common.states)[1],]))
-  plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
+rr2.ili.comp <- rr.ili2[,common.states]
+plot.state.rank <-
+  cbind.data.frame(state.index=1:dim(rr.common.states)[2],state.rank= rank(-rr.common.states[n.nonmiss,]))
+
+plot.state.rank <-
+  plot.state.rank[order(plot.state.rank$state.rank),]
   plot.state.indices <- plot.state.rank$state.index
   
-date.start <-unique(pi.data$week_start[pi.data$weeknumber==27 & year(pi.data$week_start)==2019])
-dates.plot4 <- seq.Date(from=date.start[1], length.out=52, by='week')
+dates1 <- unique(comb2[,c("week_end_date" ,'year.x','week.x')])
 
-  par(mfrow=c(5,4), mar=c(2,4,2,2))
+dates.plot4 <- seq.Date(from=dates1$week_end_date[dates1$year.x==2019 & dates1$week.x==27][1], length.out=52, by='week')
+
+
+par(mfrow=c(5,4), mar=c(2,4,2,2))
 
 for(i in plot.state.indices){
     y.range1<-c(0,5)
-    ds2<-cbind.data.frame('epiwk'=mmwr.epiwk,'epiyr'=mmwr.epiyr, rr=rr2.comp[,i])
-    ds2.c<-dcast(ds2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
-    
     if(dimnames(rr.common.states)[[2]][i] %in% state.abb2 ){
       state.name.plot <-    
       state.name2[match(dimnames(rr.common.states)[[2]][i],state.abb2)]
@@ -1058,9 +1067,8 @@ for(i in plot.state.indices){
     state.name.plot <- dimnames(rr.common.states)[[2]][i]
     }
     
-    cols1<-c(rep('grey',(ncol(ds2.c)-2) ),'red')
     plot(dates.plot4         ,
-       exp(ds2.c[,'2019']),
+       rr2.comp[,i],
        type='l',
        col='#e41a1c',
        ylim=y.range1,
@@ -1072,17 +1080,15 @@ for(i in plot.state.indices){
        ylab='Observed/Expected'
        #main=common.states[i]
        )
-    axis(1, at=as.Date(c('2019-07-01', '2019-10-01','2020-01-01', '2020-04-01', '2020-07-01')) , labels= c('Jul','Oct','Jan','Apr','Jul')  )
+    axis(1, at=as.Date(c('2019-07-01', '2019-10-01','2020-01-01', '2020-04-01', '2020-07-01')) , labels= c('Jul','Oct','Jan','Apr','')  )
 
-  es2<-cbind.data.frame('epiwk'=mmwr.epiwk.ili,'epiyr'=mmwr.epiyr.ili, rr=rr2.ili.comp[,i])
-    es2.c<-dcast(es2, epiwk~epiyr, value.var='rr', fun.aggregate = mean)
-     points(dates.plot4         ,
-       exp(es2.c[,'2019']), type='l', col='#377eb8')
+      points(dates.plot4[1:nrow(rr2.ili.comp)]         ,
+       exp(rr2.ili.comp[,i]), type='l', col='#377eb8')
     abline(h=1, col='gray', lty=2)
     
     text(min(dates.plot4), y=0.2, state.name.plot,pos=4, cex=0.9, offset=0.1, xpd=NA)
-    
- #   abline(v=as.Date(c('2020-03-07', '2020-03-21')), col=rgb(0,0,0,alpha=0.1))
+
+
 }
 
 ```
@@ -1287,58 +1293,64 @@ nyc.excess.pi[dates.select2,1,1]/nyc.excess.acm[dates.select2,1,1]
 #Run analysis 
 set.seed(123)
 excess_deaths1.unadjusted <-
-  excessCases(ds = pi.data.clean2,
+  excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
-              denom.var     = "nchs.total.deaths",
               adj.flu       = "none",
+              denom.var     = "nchs.total.deaths",
               use.syndromes = c("nchs.pic"),
-              extrapolation.date = "2020-03-01",
+              extrapolation.date = extrap.date ,
+              sum.dates = count.start.date,
+              model.type='negbin',
               time.res='week')
-syndrome.select <- 'nchs.pic' #which syndrome do you want to plot?
-n.days<-52  #How many days to plot?
-ds.unadj <- excess_deaths1.unadjusted
 ```
  
 ```{r}
 #Extract the data needed to plot from the results
-dates1.unadj <-
-  ds[[1]][[1]][[1]]$date
-  
-unexplained.cases.unadj <-
-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "unexplained.cases")
-unexplained.log.rr.unadj <-
-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "resid1")
-denom.unadj <-
-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "denom")
-upi.unadj <-
-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "upi")
-lpi.unadj <-
-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "lpi")
-obs.unadj <-
-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "y")
-pred.unadj<-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "pred")
-rr.unadj <-  excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "resid1")
-excess_deaths.unadj <- excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "unexplained.cases")
-excess_deaths_var.unadj <- excessExtract(ds = ds.unadj,
-                syndrome = syndrome.select,
-                extract.quantity = "pred.var")
+ds <- excess_deaths1.unadjusted
+
+sum.pred.iter.unadj <-    
+  excessExtract(ds = ds,
+                syndrome = 'nchs.pic',
+                extract.quantity = "sum.pred.iter")
+
+sum.obs.unadj <-
+    excessExtract(ds = ds,
+                syndrome = 'nchs.pic',
+                extract.quantity = "sum.obs")
+
+sum.obs.state.unadj <- apply(sum.obs.unadj,2,sum)
+
+sum.cases.excess.unadj <- sapply(1:length(sum.obs.state.unadj),
+                           function(x){
+  sum.obs.state.unadj[x] -  sum.pred.iter.unadj[,x,1]
+  })
+
+sum.excess.deaths.range.pi.unadj <-t(
+  apply(sum.cases.excess.unadj,2,quantile,  probs=c(0.025,0.5,0.975)))
+
+sum.excess.deaths.range.pi.unadj <- cbind.data.frame('state'=unique(analysis.data2$state), sum.excess.deaths.range.pi.unadj)
+
+formatted.pic.unadj <- 
+  paste0(round(sum.excess.deaths.range.pi.unadj[,'50%'],-1),
+                      '(' ,
+                      round(sum.excess.deaths.range.pi.unadj[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.pi.unadj[,'97.5%'],-1), ')'
+                      )
+formatted.pic.unadj <- cbind.data.frame('state'=sum.excess.deaths.range.pi.unadj$state,formatted.pic.unadj)
+
+formatted.pic.adj <- 
+  paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
+                      '(' ,
+                      round(sum.excess.deaths.range.pi[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
+                      )
+
+formatted.pic.adj <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state,formatted.pic.adj)
+
+summary.table.adj.unadj <- merge(formatted.pic.adj,formatted.pic.unadj, by='state')
+
+names(summary.table.adj.unadj) <- c('State', 'Excess P&I&C, adjusted for influenza','Excess P&I&C, unadjusted for influenza')
+htmlTable(summary.table.adj.unadj)
+
 ```
