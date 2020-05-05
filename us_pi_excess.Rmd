@@ -40,6 +40,9 @@ end.data.date <- as.Date(params$end.data.date)
 
 state.name2 <- c(state.name, 'District of Columbia','Puerto Rico', 'United States', 'New York City')
 state.abb2 <- c(state.abb, 'DC','PR','US','NYC')
+
+last.date.format <- 
+  format(end.data.date, '%b %d, %Y')
 ```
 
 
@@ -923,6 +926,7 @@ title(xlab = "Date",
 ## Table 1: Excess P&I deaths and reported deaths due to COVID-19
 
 ```{r, table1}
+nchs.tot.deaths <- aggregate(comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,                           c('nchs.covid.deaths','covid.track.death')], by=list('state'=comb2$state[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
 
 formatted.excess.ac <- 
   paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
@@ -956,20 +960,18 @@ excess.combined <-
 
 excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
 
-nchs.deaths <- aggregate(comb2[,c('nchs.covid.deaths',)])
+excess.combined <- merge(nchs.tot.deaths, excess.combined,by='state')
 
+#excess.combined
 
 #sort by incidence
-count.excess2 <- count.excess2[rev(order(count.excess2$exces_pi_INC)),]
+excess.combined <- excess.combined[rev(order(excess.combined$excess.inc.raw)),]
 
-count.excess2$total_pi_adj <- round(count.excess2$total_pi_adj)
-count.excess3 <- count.excess2[, c('state','total_pi_adj','excess_pi_ci' ,'covid.track.death','excess_pi_ci_INC')]
-names(count.excess3) <-c('State','Total P&I deaths', 'Excess P&I deaths', 'Reported COVID-19 deaths','Excess P&I deaths/1,000,000 people')
-last.date.format<-max(pi.data$week_end)
-last.date.format<-format(last.date.format,
-                         "%b %d, %Y")
+excess.combined2 <- excess.combined[,c('state','nchs.covid.deaths',"Excess P&I&C" ,"formatted.excess.ac" ,"Excess all-cause deaths/100,000")]
 
-htmlTable(count.excess3, caption=paste0('Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from January 26, 2020 through ', last.date.format), rnames=F)
+names(excess.combined2) <- c('State','COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths', 'Excess all-cause deaths', 'Excess all-cause deaths/100,000')
+
+htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
 
 
