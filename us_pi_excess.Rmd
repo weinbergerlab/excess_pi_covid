@@ -433,6 +433,7 @@ analysis.data <-
 analysis.data <- analysis.data[!is.na(analysis.data$flu_pct_adj_lag1),]
 
 states.cdc <- unique(analysis.data$state)
+states.cdc <- states.cdc[states.cdc!='US']
 
 date.print <- max(analysis.data$week_end, na.rm=T)
 
@@ -702,6 +703,14 @@ nchs.covid1<-
 
 comb2 <- merge(comb1,               nchs.covid1,by.x=c('state','week_end_date'), by.y=c('state','week_end'))
 
+
+test.ds3.spl$week_end_date <- 
+  test.ds3.spl$date + days(6)
+comb2 <- merge(comb2, test.ds3.spl,
+               by=c('state','week_end_date'), all=T)
+
+comb2$covid.track.death[is.na(comb2$covid.track.death)] <- 0
+
 write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 ```
 
@@ -711,25 +720,29 @@ write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 
 ```{r recast_summary_data}
 #recast the summary data as an array
-comb2$rr.pic <-
-  comb2$pneumonia_influenza_covid/comb2$baseline_pi
-comb2$rr.ac <-
-  comb2$all_cause_deaths/comb2$baseline_all_cause
+comb2.trim <- comb2
+comb2.trim$rr.pic <-
+  comb2.trim$pneumonia_influenza_covid/comb2.trim$baseline_pi
+comb2.trim$rr.ac <-
+  comb2.trim$all_cause_deaths/comb2.trim$baseline_all_cause
 
-comb2$epiweek <- NA
-comb2$epiweek[comb2$week.x<=26] <-
-  comb2$week.x[comb2$week.x<=26] +26
+comb2.trim <- comb2.trim[!is.na(comb2.trim$week.x),]
+comb2.trim$epiweek <- NA
+comb2.trim$epiweek[comb2.trim$week.x<=26] <-
+  comb2.trim$week.x[comb2.trim$week.x<=26] +26
 
-comb2$epiweek[comb2$week.x>=27] <-
-  comb2$week.x[comb2$week.x>=27] -26
+comb2.trim$epiweek[comb2.trim$week.x>=27] <-
+  comb2.trim$week.x[comb2.trim$week.x>=27] -26
 
-comb2$epiyr <- NA
-comb2$epiyr <- comb2$year.x
-comb2$epiyr[comb2$week.x<=26] <-
-  comb2$year.x[comb2$week.x<=26] -1
+comb2.trim$epiyr <- NA
+comb2.trim$epiyr <- comb2.trim$year.x
+comb2.trim$epiyr[comb2.trim$week.x<=26] <-
+  comb2.trim$year.x[comb2.trim$week.x<=26] -1
 
-comb2$week_end_date <-NULL
-comb2.m <- melt(comb2, id.vars=c('state','epiweek','epiyr'))
+comb2.trim$week_end_date <-NULL
+comb2.trim$date <-NULL
+
+comb2.m <- melt(comb2.trim, id.vars=c('state','epiweek','epiyr'))
 comb2.c <- acast(comb2.m, state~epiweek~epiyr~variable )
 
 nat.index <- which(dimnames(comb2.c)[[1]]=='US')
@@ -738,6 +751,74 @@ comb2.c <- comb2.c[-nat.index,,,]
 
 
 ```{r fig1, fig.width=7.3, fig.height=6.9}
+par(mfrow=c(5,4), mar=c(2,4,2,1))
+rr <- t(comb2.c[,,'2019','rr.ac'])
+rr <- rr[complete.cases(rr),]
+plot.state.rank <- cbind.data.frame(state.index=1:dim(rr)[2],state.rank= rank(-rr[dim(rr)[1],]))
+plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
+plot.state.indices <- plot.state.rank$state.index
+
+pred <- comb2.c[,,,"baseline_all_cause"  ]
+obs <- comb2.c[,,,"all_cause_deaths"  ]
+upi <- comb2.c[,,, "baseline_all_cause_upper"]
+lpi <- comb2.c[,,,"baseline_all_cause_lower"]
+
+
+states <- dimnames(comb2.c)[[1]]
+
+  
+for(i in plot.state.indices){
+    y.range1<-range(c( pred[i,,],obs[i,,], upi[i,,],0), na.rm=T)
+    if(states[i] %in% state.abb2 ){
+      state.name.plot <-    
+      state.name2[match(states[i],state.abb2)]
+    }else{
+    state.name.plot <- states[i]
+  }
+  plot( 1:52,
+       pred[i,,'2019'],
+       type='l',
+       col='red',
+       ylim=y.range1,
+       bty='l',
+       xlab='',
+       ylab='N deaths',
+       xaxt='n'
+       )
+  
+  text(x=1,y=0, state.name.plot,adj=c(0,0),cex=0.9, xpd=NA)
+
+  for(j in 1:dim(obs)[3]){
+    points(1:52,
+         obs[i,,j],
+         type='l',
+         col='gray')
+  }
+  
+    points(1:52,
+         obs[i,,'2019'],
+         type='l',
+         col='black')
+    
+  axis(side=1, at=c(1,14,27,40), labels=c('Jul','Oct','Jan','Apr'))
+    
+  lpi.miss <- lpi[i,,'2019']
+  lpi.miss <- lpi.miss[!is.na(lpi.miss)]
+  
+  upi.miss <- upi[i,,'2019']
+  upi.miss <- upi.miss[!is.na(upi.miss)]
+  
+  polygon(c(1:length(upi.miss),
+            rev(1:length(upi.miss))),
+          c(lpi.miss,
+            rev(upi.miss)),
+          col = rgb(1, 0, 0, alpha = 0.2),
+          border = NA)
+  }
+```
+
+
+```{r fig2, fig.width=7.3, fig.height=6.9}
 
 par(mfrow=c(5,4), mar=c(2,4,2,1))
 rr <- t(comb2.c[,,'2019','rr.pic'])
@@ -757,7 +838,7 @@ states <- dimnames(comb2.c)[[1]]
 
   
 for(i in plot.state.indices){
-    y.range1<-range(c( pred[i,,]/denom[i,,],obs[i,,]/denom[i,,], upi[i,,]/denom[i,,]), na.rm=T)
+    y.range1<-range(c( pred[i,,]/denom[i,,],obs[i,,]/denom[i,,], upi[i,,]/denom[i,,] ,0), na.rm=T)
     if(states[i] %in% state.abb2 ){
       state.name.plot <-    
       state.name2[match(states[i],state.abb2)]
@@ -809,128 +890,28 @@ for(i in plot.state.indices){
 ```
 
 
-```{r fig2, fig.width=7.3, fig.height=6.9}
-par(mfrow=c(5,4), mar=c(2,4,2,1))
-rr <- t(comb2.c[,,'2019','rr.ac'])
-rr <- rr[complete.cases(rr),]
-plot.state.rank <- cbind.data.frame(state.index=1:dim(rr)[2],state.rank= rank(-rr[dim(rr)[1],]))
-plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
-plot.state.indices <- plot.state.rank$state.index
-
-pred <- comb2.c[,,,"baseline_all_cause"  ]
-obs <- comb2.c[,,,"all_cause_deaths"  ]
-upi <- comb2.c[,,, "baseline_all_cause_upper"]
-lpi <- comb2.c[,,,"baseline_all_cause_lower"]
-
-
-states <- dimnames(comb2.c)[[1]]
-
-  
-for(i in plot.state.indices){
-    y.range1<-range(c( pred[i,,],obs[i,,], upi[i,,]), na.rm=T)
-    if(states[i] %in% state.abb2 ){
-      state.name.plot <-    
-      state.name2[match(states[i],state.abb2)]
-    }else{
-    state.name.plot <- states[i]
-  }
-  plot( 1:52,
-       pred[i,,'2019'],
-       type='l',
-       col='red',
-       ylim=y.range1,
-       bty='l',
-       xlab='',
-       ylab='N deaths',
-       xaxt='n'
-       )
-  
-  text(x=1,y=y.range1[2], state.name.plot, pos=4,cex=0.9, xpd=NA)
-
-  for(j in 1:dim(obs)[3]){
-    points(1:52,
-         obs[i,,j],
-         type='l',
-         col='gray')
-  }
-  
-    points(1:52,
-         obs[i,,'2019'],
-         type='l',
-         col='black')
-    
-  axis(side=1, at=c(1,14,27,40), labels=c('Jul','Oct','Jan','Apr'))
-    
-  lpi.miss <- lpi[i,,'2019']
-  lpi.miss <- lpi.miss[!is.na(lpi.miss)]
-  
-  upi.miss <- upi[i,,'2019']
-  upi.miss <- upi.miss[!is.na(upi.miss)]
-  
-  polygon(c(1:length(upi.miss),
-            rev(1:length(upi.miss))),
-          c(lpi.miss,
-            rev(upi.miss)),
-          col = rgb(1, 0, 0, alpha = 0.2),
-          border = NA)
-  }
-```
-
-
 ## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by covidtracking.com), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. Excess P&I estimates from recent weeks are adjusted for incomplete records using the "percent_complete" variable.
+The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by covidtracking.com), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. 
 
 ```{r}
-excess_deaths.df <- cbind.data.frame('date'=dates1,excess_deaths[,,1])
-excess_deaths.m <- melt(excess_deaths.df, id.vars =c('date'))
-names(excess_deaths.m) <-c('date','state','excess_pi')
 
-#excess_deaths_var
-excess_deaths.var.df <- cbind.data.frame('date'=dates1,excess_deaths_var[,,1])
-excess_deaths.var.m <- melt(excess_deaths.var.df, id.vars =c('date'))
-names(excess_deaths.var.m) <-c('date','state','excess_pi_var')
-
-excess_deaths.upi.df <- cbind.data.frame('date'=dates1,  (obs[,,1]-lpi[,,1] ))
-excess_deaths.upi.m <- melt(excess_deaths.upi.df, id.vars =c('date'))
-names(excess_deaths.upi.m) <-c('date','state','excess_deaths.upi')
-
-excess_deaths.lpi.df <- cbind.data.frame('date'=dates1,(obs[,,1]-upi[,,1]) )
-excess_deaths.lpi.m <- melt(excess_deaths.lpi.df, id.vars =c('date'))
-names(excess_deaths.lpi.m) <-c('date','state','excess_deaths.lpi')
-
-total_pi_df <- cbind.data.frame('date'=dates1,(obs[,,1]) )
-total_pi_df.m <- melt(total_pi_df, id.vars =c('date'))
-names(total_pi_df.m) <-c('date','state','total_pi')
-
-#states.cdc <- unique(excess_deaths.m$state)
-jh3 <- merge(excess_deaths.m, excess_deaths.lpi.m, by=c('state','date') , all=T)
-jh3 <- merge(jh3, excess_deaths.upi.m, by=c('state','date') , all=T)
-jh3 <- merge(jh3, total_pi_df.m, by=c('state','date') , all=T)
-jh3 <- merge(jh3, excess_deaths.var.m, by=c('state','date') , all=T)
-
-#jh3 <-jh3[jh3$state %in% states.cdc,]
-
-
-jh3 <- merge( jh3, pi.data.clean2[c('state', "week_start",'percent_complete',"nchs.covid.deaths")], by.x=c('state','date') , by.y=c('state',"week_start"), all=T)
-
-jh3 <- merge(jh3, test.ds3.spl, by=c('state','date'), all=T)
-jh3$covid.track.death[is.na(jh3$covid.track.death)] <- 0
-
-
+jh3 <- comb2
 #Only plot out to 1 week ahead of the US P&I data
-jh3 <- jh3[ jh3$date <= max(pi.data$"week_start" +weeks(1), na.rm=T),]
+jh3 <- jh3[ jh3$week_end_date <= end.data.date +weeks(1),]
 jh3 <- jh3[jh3$state %in% states.cdc,]
 #jh3 <-jh3[!is.na(jh3$excess_pi ),]
 
 
-jh3<-jh3[jh3$date >=as.Date(count.start.date),]
+jh3<-jh3[jh3$week_end_date >=as.Date('2020-02-01'),]
+
+jh3 <- jh3[!is.na(jh3$week_end_date),]
 ```
 
 ```{r fig3, fig.width=7.3, fig.height=6.9}
 ## uses NCHS covid deaths for reported deaths
 
   par(mfrow=c(5,4), mar=c(2,4,3,1), oma = c(3,3,0,3) + 0.1)
-ts.plot.func(ds.plot=jh3, death.var='nchs.covid.deaths' ,states.plot=unique(jh3$state),ylim.adj=2.0 )
+ts.plot.func(ds.plot=jh3,   states.plot=unique(jh3$state),ylim.adj=15.0 ,death.var="nchs.covid.deaths" )
 
 title(xlab = "Date",
       ylab = "N Deaths",
