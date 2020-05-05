@@ -110,7 +110,7 @@ runIfExpired <- function(storeName, f, maxage=hours(1000000)) {
 ```
 
 ```{r states_to_plot}
-plot.states <- c('CA','TX','FL','NJ', 'NY','PA','IL','GA','MI','LA', 'MA' )
+plot.states <- c('CA','TX','FL','NJ', 'NY','WA','IL','GA','MI','LA', 'MA' )
 
 exclude.states <- c('CT', 'NC', 'PR') #no up-to-date number
 #exclude.states <- c('')
@@ -682,16 +682,17 @@ points(res.ac.nat$week_end, res.ac.nat$obs, type='l', col='red', bty='l')
 ```
 
 ```{r summary_table_natl}
-res.pi2 <- res.pi1
+res.pi2 <- res.pi
 names(res.pi2) <-
-  c('week_end_date','state','baseline_pi','baseline_pi_lower', 'baseline_pi_upper', 'pneumonia_influenza_covid','excess_pneumonia_influenza_covid')
+  c('year','week','day','week_end_date','state','baseline_pi','baseline_pi_lower', 'baseline_pi_upper', 'pneumonia_influenza_covid','excess_pneumonia_influenza_covid','pic.denom')
 
-res.ac2 <- res.ac1
+res.ac2 <- res.ac
 res.ac2$denom <-NULL
 names(res.ac2) <-
   c('year','week','day','week_end_date','state','baseline_all_cause','baseline_all_cause_lower', 'baseline_all_cause_upper', 'all_cause_deaths','excess_all_cause_deaths')
 
 res.ac2$week_end_date <- res.ac2$week_end_date + days(6)
+res.pi2$week_end_date <- res.pi2$week_end_date + days(6)
 comb1 <- merge(res.ac2, res.pi2,
                by=c('state','week_end_date'), all=T)
 
@@ -699,8 +700,7 @@ nchs.covid1<-
   analysis.data2[,c('state','week_end','nchs.covid.deaths')]
 
 
-comb2 <- merge(comb1,
-               nchs.covid1,by.x=c('state','week_end_date'), by.y=c('state','week_end'))
+comb2 <- merge(comb1,               nchs.covid1,by.x=c('state','week_end_date'), by.y=c('state','week_end'))
 
 write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 ```
@@ -709,21 +709,24 @@ write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 ## Figure 1: Observed weekly death rate vs seasonal baseline (+/-95% Prediction Interval) 
  The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza (P&I) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
 
-
-```{r}
+```{r recast_summary_data}
 #recast the summary data as an array
 comb2$rr.pic <-
   comb2$pneumonia_influenza_covid/comb2$baseline_pi
+comb2$rr.ac <-
+  comb2$all_cause_deaths/comb2$baseline_all_cause
+
 comb2$epiweek <- NA
-comb2$epiweek[comb2$week<=26] <-
-  comb2$week[comb2$week<=26] +26
+comb2$epiweek[comb2$week.x<=26] <-
+  comb2$week.x[comb2$week.x<=26] +26
 
-comb2$epiweek[comb2$week>=27] <-
-  comb2$week[comb2$week>=27] -26
+comb2$epiweek[comb2$week.x>=27] <-
+  comb2$week.x[comb2$week.x>=27] -26
 
-comb2$epiyr <- comb2$year
-comb2$epiyr[comb2$week<=26] <-
-  comb2$year[comb2$week<=26] -1
+comb2$epiyr <- NA
+comb2$epiyr <- comb2$year.x
+comb2$epiyr[comb2$week.x<=26] <-
+  comb2$year.x[comb2$week.x<=26] -1
 
 comb2$week_end_date <-NULL
 comb2.m <- melt(comb2, id.vars=c('state','epiweek','epiyr'))
@@ -731,8 +734,8 @@ comb2.c <- acast(comb2.m, state~epiweek~epiyr~variable )
 
 nat.index <- which(dimnames(comb2.c)[[1]]=='US')
 comb2.c <- comb2.c[-nat.index,,,]
-
 ```
+
 
 ```{r fig1, fig.width=7.3, fig.height=6.9}
 
@@ -754,7 +757,7 @@ states <- dimnames(comb2.c)[[1]]
 
   
 for(i in plot.state.indices){
-    y.range1<-range(c( pred/denom,obs/denom, upi/denom), na.rm=T)
+    y.range1<-range(c( pred[i,,]/denom[i,,],obs[i,,]/denom[i,,], upi[i,,]/denom[i,,]), na.rm=T)
     if(states[i] %in% state.abb2 ){
       state.name.plot <-    
       state.name2[match(states[i],state.abb2)]
@@ -800,11 +803,78 @@ for(i in plot.state.indices){
             rev(1:length(upi.miss))),
           c(lpi.miss/denom.miss,
             rev(upi.miss/denom.miss)),
-          col = rgb(1, 0, 0, alpha = 0.3),
+          col = rgb(1, 0, 0, alpha = 0.2),
           border = NA)
   }
 ```
 
+
+```{r fig2, fig.width=7.3, fig.height=6.9}
+par(mfrow=c(5,4), mar=c(2,4,2,1))
+rr <- t(comb2.c[,,'2019','rr.ac'])
+rr <- rr[complete.cases(rr),]
+plot.state.rank <- cbind.data.frame(state.index=1:dim(rr)[2],state.rank= rank(-rr[dim(rr)[1],]))
+plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
+plot.state.indices <- plot.state.rank$state.index
+
+pred <- comb2.c[,,,"baseline_all_cause"  ]
+obs <- comb2.c[,,,"all_cause_deaths"  ]
+upi <- comb2.c[,,, "baseline_all_cause_upper"]
+lpi <- comb2.c[,,,"baseline_all_cause_lower"]
+
+
+states <- dimnames(comb2.c)[[1]]
+
+  
+for(i in plot.state.indices){
+    y.range1<-range(c( pred[i,,],obs[i,,], upi[i,,]), na.rm=T)
+    if(states[i] %in% state.abb2 ){
+      state.name.plot <-    
+      state.name2[match(states[i],state.abb2)]
+    }else{
+    state.name.plot <- states[i]
+  }
+  plot( 1:52,
+       pred[i,,'2019'],
+       type='l',
+       col='red',
+       ylim=y.range1,
+       bty='l',
+       xlab='',
+       ylab='N deaths',
+       xaxt='n'
+       )
+  
+  text(x=1,y=y.range1[2], state.name.plot, pos=4,cex=0.9, xpd=NA)
+
+  for(j in 1:dim(obs)[3]){
+    points(1:52,
+         obs[i,,j],
+         type='l',
+         col='gray')
+  }
+  
+    points(1:52,
+         obs[i,,'2019'],
+         type='l',
+         col='black')
+    
+  axis(side=1, at=c(1,14,27,40), labels=c('Jul','Oct','Jan','Apr'))
+    
+  lpi.miss <- lpi[i,,'2019']
+  lpi.miss <- lpi.miss[!is.na(lpi.miss)]
+  
+  upi.miss <- upi[i,,'2019']
+  upi.miss <- upi.miss[!is.na(upi.miss)]
+  
+  polygon(c(1:length(upi.miss),
+            rev(1:length(upi.miss))),
+          c(lpi.miss,
+            rev(upi.miss)),
+          col = rgb(1, 0, 0, alpha = 0.2),
+          border = NA)
+  }
+```
 
 
 ## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
