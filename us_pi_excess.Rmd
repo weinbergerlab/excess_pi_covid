@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
-date: "5/1/2020"
+date: "5/5/2020"
 output:
   html_document:
     df_print: paged
@@ -91,7 +91,7 @@ source('./functions/format_table.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(1000000)) {
+runIfExpired <- function(storeName, f, maxage=hours(24)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
