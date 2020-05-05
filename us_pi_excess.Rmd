@@ -1038,10 +1038,10 @@ rr.state.ac <- t(comb2.c[,,'2019','rr.ac'])
 
 ```{r fig4, fig.width=7.3, fig.height=7}
 common.states <- 
-  intersect(colnames(rr.state.pic), colnames(rr2.ili) )
+  intersect(colnames(rr.state.pic), colnames(rr.ili2) )
 
-n.nonmiss <- sum(!is.na(rr.common.states[,1]))
 rr.common.states <- rr.state.pic[,common.states]
+n.nonmiss <- sum(!is.na(rr.common.states[,1]))
 rr2.comp <-rr.common.states
 rr2.ili.comp <- rr.ili2[,common.states]
 plot.state.rank <-
@@ -1126,46 +1126,6 @@ cp.pi.waics <- round(sapply(cp.pi,'[[', 'w.aics'),2)
 
 
 
-## Table S1: Excess deaths by week across the US, compared with provisional death counts from NCHS
-Note excess P&I deaths numbers do not include Connecticut, North Carolina, and West Virginia. Combining together the exces P&I and COIVD-19 deaths without pneumonia diagnoses gives an estimate for number of deaths   
-```{r}
-count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <= max(pi.data$week_end) ,]
-
-count.excess$excess_pi_adj <- count.excess$excess_pi
-
-count.excess$total_pi_adj <- count.excess$total_pi
-
-count.excess$excess_pi_var_ADJ <- count.excess$excess_pi_var
-
-count.excess2 <- aggregate(count.excess[,c('excess_pi_adj','total_pi_adj',"nchs.covid.deaths","covid.track.death" ,'excess_pi_var_ADJ')], by=list('date'=count.excess$date) ,FUN=sum)
-
-count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
-
-count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
-
-
-count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi_adj), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
-
-#sort by incidence
-count.excess2 <- count.excess2[(order(count.excess2$date)),]
-
-count.excess2$total_pi_adj <- round(count.excess2$total_pi_adj)
-
-count.excess2$wk.end <-count.excess2$date+6
-
-count.excess3 <- count.excess2[, c('wk.end','total_pi_adj','excess_pi_ci' ,"nchs.covid.deaths","covid.track.death" )]
-
-names(count.excess3) <-c('Week ending','Total P&I deaths', 'Excess P&I&C deaths', 'Covid-19 Deaths NCHS','All reported COVID-19 deaths (covidtracking.com)')
-last.date.format<-max(pi.data$week_end)
-last.date.format<-format(last.date.format,
-                         "%b %d, %Y")
-
-count.excess4 <- count.excess3
-
-htmlTable(count.excess4, caption=paste0('Table S1: Comparison of data sources: Observed and Excess deaths due to pneumonia & influenza, and COVID-19, from January 26, 2020 through ', last.date.format), rnames=F)
-```
-
-
 
 ```{r, eval=F}
 #Just NY
@@ -1208,9 +1168,9 @@ for(i in c('NY','NJ','CA','MA')){
 excess.ny.pic <- comb2.c[i,,'2019',"excess_pneumonia_influenza_covid"  ]
 excess.ny.ac <- comb2.c[i,,'2019',"excess_all_cause_deaths" ]
 
+covid.ny <- comb2.c[i,,'2019',"nchs.covid.deaths" ]
 n.nonmiss <- sum(!is.na(covid.ny))
 
-covid.ny <- comb2.c[i,,'2019',"nchs.covid.deaths" ]
 plot(1:n.nonmiss,excess.ny.ac[1:n.nonmiss], type='l', bty='l', ylab='Excess deaths (N)', main=i, xaxt='n')
 axis(side=1, at=c(1,14,27,40), label=c('Jul','Oct','Jan', 'Apr'))
 points(1:n.nonmiss,excess.ny.pic[1:n.nonmiss], type='l', col='red')
@@ -1351,6 +1311,11 @@ formatted.pic.adj <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state,f
 summary.table.adj.unadj <- merge(formatted.pic.adj,formatted.pic.unadj, by='state')
 
 names(summary.table.adj.unadj) <- c('State', 'Excess P&I&C, adjusted for influenza','Excess P&I&C, unadjusted for influenza')
-htmlTable(summary.table.adj.unadj)
+htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to pneumonia/influenza/Covid-19, as estimated from a regression that adjusts for influenza with a regression that does not')
 
 ```
+
+```{r}
+
+```
+
