@@ -923,30 +923,41 @@ title(xlab = "Date",
 ## Table 1: Excess P&I deaths and reported deaths due to COVID-19
 
 ```{r, table1}
-count.excess <-jh3[jh3$date >= as.Date(count.start.date) & jh3$date <=max(pi.data$week_end) ,]
 
-count.excess$excess_pi_adj <-count.excess$excess_pi/count.excess$percent_complete
+formatted.excess.ac <- 
+  paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
+                      '(' ,
+                      round(sum.excess.deaths.range.ac[,'2.5%'],-2), ',' ,
+                      round(sum.excess.deaths.range.ac[,'97.5%'],-2), ')'
+                      )
+formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.excess.ac)
 
-count.excess$total_pi_adj <-count.excess$total_pi/count.excess$percent_complete
 
-count.excess$excess_pi_var_ADJ <- count.excess$excess_pi_var/count.excess$percent_complete
+formatted.excess.pic <- 
+  paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
+                      '(' ,
+                      round(sum.excess.deaths.range.pi[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
+                      )
+formatted.excess.pic <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state, 'Excess P&I&C'= formatted.excess.pic)
 
-count.excess2 <- aggregate(count.excess[,c('excess_pi_adj','total_pi_adj','covid.track.death','excess_pi_var_ADJ')], by=list('state'=count.excess$state) ,FUN=sum)
+sum.excess.deaths.range.ac.inc <- merge(sum.excess.deaths.range.ac, pop2, by='state', all=T)
 
-count.excess2 <- merge(count.excess2, pop2, by='state')
+formatted.excess.ac.INC <- 
+  paste0(round(sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1),
+                      '(' ,
+                      round(sum.excess.deaths.range.ac.inc[,'2.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ',' ,
+                      round(sum.excess.deaths.range.ac.inc[,'97.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ')'
+                      )
+formatted.excess.ac.INC <- cbind.data.frame('state'=sum.excess.deaths.range.ac.inc$state, 'Excess all-cause deaths/100,000'= formatted.excess.ac.INC, "excess.inc.raw"=sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000)
 
-count.excess2$exces_ci_ucl <- round(count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
+excess.combined <-
+  merge(formatted.excess.pic,formatted.excess.ac.INC, by='state')
 
-count.excess2$exces_ci_lcl <- round(count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var_ADJ))
+excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
 
-count.excess2$exces_ci_ucl_INC <- (count.excess2$excess_pi_adj + 1.96*sqrt(count.excess2$excess_pi_var_ADJ))/count.excess2$census_bureau_pop_2019*1000000
+nchs.deaths <- aggregate(comb2[,c('nchs.covid.deaths',)])
 
-count.excess2$exces_ci_lcl_INC <- (count.excess2$excess_pi_adj - 1.96*sqrt(count.excess2$excess_pi_var_ADJ))/count.excess2$census_bureau_pop_2019*1000000
-
-count.excess2$exces_pi_INC <- count.excess2$excess_pi_adj/count.excess2$census_bureau_pop_2019*1000000
-
-count.excess2$excess_pi_ci <- paste0(round(count.excess2$excess_pi_adj), '(',  count.excess2$exces_ci_lcl, ', ', count.excess2$exces_ci_ucl,')'  ) 
-count.excess2$excess_pi_ci_INC <- paste0(round(count.excess2$exces_pi_INC,1), ' (',  round(count.excess2$exces_ci_lcl_INC,1), ', ', round(count.excess2$exces_ci_ucl_INC,1),')'  ) 
 
 #sort by incidence
 count.excess2 <- count.excess2[rev(order(count.excess2$exces_pi_INC)),]

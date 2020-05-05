@@ -7,7 +7,7 @@ for(i in plot.state.indices){
   ds.select <- ds.plot[ds.plot$state==states.cdc[i],]
   max.test.this.state <- max(ds.select$test.week.per.capita, na.rm=T)
   ave_pi <- mean(ds.select$pneumonia_influenza_covid, na.rm=T)
-  y.range1<-range(c(ds.select[,death.var], (ds.select$excess_pi)), na.rm=T)
+  y.range1<-range(c(ds.select[,death.var], (ds.select$excess_pneumonia_influenza_covid)), na.rm=T)
   
   #Makes all have same relative range
   #ave.range <- c(-ave_pi*0.2, ave_pi*ylim.adj)
