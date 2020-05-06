@@ -509,22 +509,20 @@ Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farza
 ^6^Department of Science and Environment, Roskilde University, Denmark
 ^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
 
-## IMPORTANT NOTE
-Starting April 17, fluview started reporting death data with a 1 week lag, rather than a 2 week lag. Data from the recent weeks are highly incomplete and should be interpreted with caution
-
 ## Abstract
 
-*Background*
-Tracking the severity and public health impact of emerging diseases, such as the novel coronavirus diseases COVID-19, is a critical need. These efforts are often hampered by testing issues and reporting lags for key epidemiological data. Evaluating unexplained increases in deaths attributed to non-specific causes, such as pneumonia, can provide a more complete picture of the burden caused by COVID-19. 
+*Background* 
+Efforts to track the severity and public health impact of the novel coronavirus, COVID-19, in the US have been hampered by testing issues, reporting lags, and inconsistency between states. Evaluating unexplained increases in deaths attributed to broad outcomes, such as pneumonia and influenza or due to all causes, can provide a more complete and consistent picture of the burden caused by COVID-19. 
 
 *Methods*
-We evaluated increases in the occurrence of deaths due to P&I above a seasonal baseline across the United States and compared the rate of excess deaths to reported rates of death due to COVID-19, as well as state-level coronavirus testing rates and excess rates of influenza-like illness. 
+We evaluated increases in the occurrence of deaths due to any cause above a seasonal baseline  (adjusted for influenza activity) or deaths due to coronaivirus/P&I (P&I&C) for March-early-April across the United States. These estimates are compared with reported deaths due to COVID-19 and with testing data.
 
 *Results*
-There were notable increases in the rate of death due to pneumonia and influenza. In a number of states, these increases pre-dated the increase in testing rates and went uncounted. There was substantial variability between states in the discrepancy between reported rates of death due to COVID-19 and the estimated burden of excess deaths due to P&I. In some states, the burden of reported deaths was 10-fold lower than the burden of excess deaths due to P&I. 
+There were notable increases in the rate of death due to all-causes and due to P&I&C in March and early-April 2020. In a number of states, these deaths pre-dated increases in COVID-19 testing rates and were not counted in official records at the time as related to COVID-19. There was substantial variability between states in the discrepancy between reported rates of death due to COVID-19 and the estimated burden of excess deaths due to P&I. The increase in all-cause deaths is 1.5 times higher than the official tally of COVID-19 reported deaths during the study period. 
 
 *Conclusions*
-Given the lack of consistent virological testing, tracking spikes in deaths due to non-specific causes provides the most complete estimate of the burden of COVID-19. This approach provides a framework for tracking the progression of the epidemic and its public health impact. 
+Excess deaths provide an estimate of full COVID-19 burden and indicate that official tallies likely undercount deaths due to the virus.
+
 
 ## National analysis of P&I
 ```{r natl_pi_analysis, include=F}
