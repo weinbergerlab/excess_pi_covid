@@ -312,7 +312,7 @@ pi.data.not.miss.states <-
 url.cdc.covid <- "https://data.cdc.gov/resource/r8kw-7aab.json"
 #ARCHIVE
 cdc.data <- runIfExpired('cdc_covid_data', 
- ~jsonlite::read_json(url.cdc.covid, simplifyVector = T),maxage=hours(24))
+ ~jsonlite::read_json(url.cdc.covid, simplifyVector = T))
 
 names(cdc.data) <- 
   c('data_as_of','start_week', 'end_week', 'group', 'state','indicator','nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')
@@ -1414,15 +1414,20 @@ matplot(us.nv[1:17,], type='l')
 ```
 
 
-```{r}
-#and do same thing looking at flu death
-vs.date <- mmwr_week(nrevvs.combo$wk_date)
-nrevvs.combo2 <- cbind.data.frame(nrevvs.combo,vs.date)
-nrevvs.m <- melt(nrevvs.combo2[,c("flu_pct_adj",'state',"mmwr_week","mmwr_year")], id.vars=c("mmwr_week","mmwr_year",'state'))
-nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
+```{r, eval=F}
+pi.data.nat <- pi_mortality(coverage_area='national')
 
-us.nv <- nrevvs.c[,,'US']
-matplot(us.nv[1:17,], type='l')
+flu.deaths <- pi.data.nat
+#and do same thing looking at flu death
+fd.date <- mmwr_week(flu.deaths$week_end)
+flu.deaths <- cbind.data.frame(fd.date,flu.deaths)
+
+fd.m <- melt(flu.deaths[,c("number_influenza","mmwr_week","mmwr_year")], id.vars=c("mmwr_week","mmwr_year"))
+fd.c <- dcast(fd.m, mmwr_week~mmwr_year)
+
+col.plot <- c(rep('gray',7), 'red')
+matplot(fd.c[1:17,-1], type='l', col=col.plot, bty='l')
+
 ```
 
 
