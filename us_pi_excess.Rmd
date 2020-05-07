@@ -301,7 +301,6 @@ pi.data.not.miss.states <- state.abb2[match(pi.data.not.miss.states, state.name2
 pi.data.not.miss.states <-
   pi.data.not.miss.states[!is.na(pi.data.not.miss.states)]
 
-
 ```
 
 ```{r import_cdc_covid_view}
@@ -1402,11 +1401,30 @@ htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to a
 
 ```
 
-```{r}
-nrevvs.m <- melt(nrevvs.combo[,c("flu_pct_adj",'state','wk_date')], id.vars=c('wk_date','state'))
-nv
-nrevvs.c <- dcast(nrevvs.m, wk_date~state)
+```{r, eval=F}
+#Plot flu positivity this year vs previous years
+vs.date <- mmwr_week(nrevvs.combo$wk_date)
+nrevvs.combo2 <- cbind.data.frame(nrevvs.combo,vs.date)
+nrevvs.m <- melt(nrevvs.combo2[,c("flu_pct_adj",'state',"mmwr_week","mmwr_year")], id.vars=c("mmwr_week","mmwr_year",'state'))
+nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
+
+us.nv <- nrevvs.c[,,'US']
+matplot(us.nv[1:17,], type='l')
+(#NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
 ```
+
+
+```{r}
+#and do same thing looking at flu death
+vs.date <- mmwr_week(nrevvs.combo$wk_date)
+nrevvs.combo2 <- cbind.data.frame(nrevvs.combo,vs.date)
+nrevvs.m <- melt(nrevvs.combo2[,c("flu_pct_adj",'state',"mmwr_week","mmwr_year")], id.vars=c("mmwr_week","mmwr_year",'state'))
+nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
+
+us.nv <- nrevvs.c[,,'US']
+matplot(us.nv[1:17,], type='l')
+```
+
 
 #Evaluation of reporting Delays
 ```{r, eval=F}
