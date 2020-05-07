@@ -943,7 +943,7 @@ nchs.tot.deaths <- aggregate(comb2[comb2$week_end_date>=count.start.date & comb2
 
 formatted.excess.ac <- 
   paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
-                      '(' ,
+                      ' (' ,
                       round(sum.excess.deaths.range.ac[,'2.5%'],-2), ',' ,
                       round(sum.excess.deaths.range.ac[,'97.5%'],-2), ')'
                       )
@@ -952,7 +952,7 @@ formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state
 
 formatted.excess.pic <- 
   paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
-                      '(' ,
+                      ' (' ,
                       round(sum.excess.deaths.range.pi[,'2.5%'],-1), ',' ,
                       round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
                       )
@@ -964,7 +964,7 @@ sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac
 
 formatted.excess.ac.INC <- 
   paste0(round(sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1),
-                      '(' ,
+                      ' (' ,
                       round(sum.excess.deaths.range.ac.inc[,'2.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ',' ,
                       round(sum.excess.deaths.range.ac.inc[,'97.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ')'
                       )
@@ -1266,7 +1266,7 @@ nyc.excess.acm[dates.select2,1,1]/nyc.excess.pi[dates.select2,1,1]
 
 
 
-## Table S3: Do not adjust for flu
+## Table S1: Do not adjust for flu: P&I
 
 ```{r, include=F} 
 #Run analysis 
@@ -1334,6 +1334,79 @@ htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to p
 
 ```
 
+## Table S2: Do not adjust for flu: all-cause
+
+```{r, include=F} 
+#Run analysis 
+set.seed(123)
+excess_deaths1.unadjusted <-
+  excessCases(ds = analysis.data2,
+              datevar       = "week_end",
+              statevar      = "state",
+              adj.flu       = "none",
+              denom.var     = "one",
+              use.syndromes = c("nchs.total.deaths"),
+              extrapolation.date = extrap.date ,
+              sum.dates = count.start.date,
+              model.type='negbin',
+              time.res='week')
+```
+ 
+```{r}
+#Extract the data needed to plot from the results
+ds <- excess_deaths1.unadjusted
+
+sum.pred.iter.unadj <-    
+  excessExtract(ds = ds,
+                syndrome = 'nchs.total.deaths',
+                extract.quantity = "sum.pred.iter")
+
+sum.obs.unadj <-
+    excessExtract(ds = ds,
+                syndrome = 'nchs.total.deaths',
+                extract.quantity = "sum.obs")
+
+sum.obs.state.unadj <- apply(sum.obs.unadj,2,sum)
+
+sum.cases.excess.unadj <- sapply(1:length(sum.obs.state.unadj),
+                           function(x){
+  sum.obs.state.unadj[x] -  sum.pred.iter.unadj[,x,1]
+  })
+
+sum.excess.deaths.range.ac.unadj <-t(
+  apply(sum.cases.excess.unadj,2,quantile,  probs=c(0.025,0.5,0.975)))
+
+sum.excess.deaths.range.ac.unadj <- cbind.data.frame('state'=unique(analysis.data2$state), sum.excess.deaths.range.ac.unadj)
+
+formatted.ac.unadj <- 
+  paste0(round(sum.excess.deaths.range.ac.unadj[,'50%'],-1),
+                      '(' ,
+                      round(sum.excess.deaths.range.ac.unadj[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.ac.unadj[,'97.5%'],-1), ')'
+                      )
+formatted.ac.unadj <- cbind.data.frame('state'=sum.excess.deaths.range.ac.unadj$state,formatted.ac.unadj)
+
+formatted.ac.adj <- 
+  paste0(round(sum.excess.deaths.range.ac[,'50%'],-1),
+                      '(' ,
+                      round(sum.excess.deaths.range.ac[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.ac[,'97.5%'],-1), ')'
+                      )
+
+formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.ac.adj)
+
+summary.table.adj.unadj <- merge(formatted.ac.adj,formatted.ac.unadj, by='state')
+
+names(summary.table.adj.unadj) <- c('State', 'Excess deaths, adjusted for influenza','Excess deaths, unadjusted for influenza')
+htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to any cause, as estimated from a regression that adjusts for influenza with a regression that does not')
+
+```
+
+```{r}
+nrevvs.m <- melt(nrevvs.combo[,c("flu_pct_adj",'state','wk_date')], id.vars=c('wk_date','state'))
+nv
+nrevvs.c <- dcast(nrevvs.m, wk_date~state)
+```
 
 #Evaluation of reporting Delays
 ```{r, eval=F}
