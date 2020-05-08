@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-18'
+  end.data.date: '2020-04-11'
 ---
 
 ```{r, include = F}
@@ -91,7 +91,7 @@ source('./functions/format_table.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(24)) {
+runIfExpired <- function(storeName, f, maxage=hours(999999)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -167,8 +167,8 @@ hhs_states.cw$state_region[hhs_states.cw$state_region != hhs_states.cw$state] <-
 #download the NREVSS data
 
 #ARCHIVE
-nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c("state")))
-  
+#nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c("state")))
+nrevvs.state <- readRDS('./Data/nrevss_state/2020_05_05_15_56.rds')
   clin <- nrevvs.state[["clinical_labs"]]
   clin$state <- state.abb2[match(clin$region, state.name2)]
   
@@ -202,8 +202,8 @@ nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c(
   ##Florida doesn't have ILI data, so use regions ILI dat
   #
   #ARCHIVE
-  nrevvs_hhs <- runIfExpired('nrevss_hhs', ~cdcfluview::who_nrevss(region = c("hhs")))
-  
+#  nrevvs_hhs <- runIfExpired('nrevss_hhs', ~cdcfluview::who_nrevss(region = c("hhs")))
+  nrevvs_hhs<-readRDS('./Data/nrevss_hhs/2020_05_05_15_56.rds')
   clin.hhs <- nrevvs_hhs[["clinical_labs"]]
   clin.hhs.subsetvars <-
     c('region',
@@ -254,7 +254,8 @@ clin4.lags <- merge(clin4, clin4.lag1, by=c('state','wk_date'))
 clin4.lags <- merge(clin4.lags, clin4.lag2, by=c('state','wk_date'))
 
   ##national flu data
-nrevvs.natl <- runIfExpired('nrevss_national', ~cdcfluview::who_nrevss(region = c("national")))
+#nrevvs.natl <- runIfExpired('nrevss_national', ~cdcfluview::who_nrevss(region = c("national")))
+nrevvs.natl <- readRDS('./Data/nrevss_national/2020_05_05_15_56.rds')
 nrevvs.natl <- nrevvs.natl$clinical_labs
 nrevvs.natl <-
   nrevvs.natl[,c('wk_date','percent_positive') ]
@@ -281,7 +282,8 @@ nrevvs.combo <-
 #Import the P&I data from fluview--this is used to set the historical baseline; updated weekly
 
 #ARCHIVE
-pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
+#pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
+pi.data <- readRDS('./Data/pi_mortality_state/2020_05_05_15_56.rds')
 
 pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) & pi.data$geo_description=='State',]
 
@@ -311,8 +313,10 @@ pi.data.not.miss.states <-
 #Updated week days
 url.cdc.covid <- "https://data.cdc.gov/resource/r8kw-7aab.json"
 #ARCHIVE
-cdc.data <- runIfExpired('cdc_covid_data', 
- ~jsonlite::read_json(url.cdc.covid, simplifyVector = T))
+#cdc.data <- runIfExpired('cdc_covid_data', 
+# ~jsonlite::read_json(url.cdc.covid, simplifyVector = T))
+
+cdc.data<- readRDS('./Data/cdc_covid_data/2020_05_06_10_11.rds')
 
 names(cdc.data) <- 
   c('data_as_of','start_week', 'end_week', 'group', 'state','indicator','nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')
@@ -322,7 +326,7 @@ cdc.data$start_week <- NULL
 cdc.data$end_week <-
   as.Date(substr(cdc.data$end_week,1,10))
 
-most.recent <- max(cdc.data$data_as_of)
+most.recent <- min(cdc.data$data_as_of)
 cdc.data <- cdc.data[cdc.data$data_as_of==most.recent,]
 
 #Convert character to numeric
@@ -450,7 +454,9 @@ date.print <- max(analysis.data$week_end, na.rm=T)
 url.test<-"https://covidtracking.com/api/v1/states/daily.json" 
 
 #ARCHIVE
-json_data <- runIfExpired('covidtracking_states_daily', ~fromJSON(file=url.test))
+#json_data <- runIfExpired('covidtracking_states_daily', ~fromJSON(file=url.test))
+json_data<- readRDS('./Data/covidtracking_states_daily/2020_05_05_15_57.rds')
+
 test.dates <- as.character(sapply(json_data,'[[','date'))
 
 test.state <- sapply(json_data,'[[','state')
@@ -577,7 +583,7 @@ write.csv(res.pi, './outputs/p_i_natl_obs_expected.csv')
 
 res.pi.nat <- res.pi[res.pi$state=='US',]
 
-sum(res.pi.nat$unexplained.cases[res.pi.nat$mmwr_week>=10 &                              res.pi.nat$mmwr_week<=15 & res.pi.nat$week_end>=as.Date('2020-01-01')])
+sum(res.pi.nat$unexplained.cases[res.pi.nat$mmwr_week>=10 &                              res.pi.nat$mmwr_week<=16 & res.pi.nat$week_end>=as.Date('2020-01-01')])
 ```
 
 Excess deaths due to pneumonia/influenza/covid nationally in the specified time period
@@ -1004,7 +1010,8 @@ Here we compare the observed vs expected number of deaths due to pneumonia and i
 
 ```{r, include=F}
 #ARCHIVE
-ili.data <- runIfExpired('ilinet_state', ~ilinet(region = c("state")))
+#ili.data <- runIfExpired('ilinet_state', ~ilinet(region = c("state")))
+ili.data <- readRDS('./Data/ilinet_state/2020_05_05_15_57.rds')
 ili.data$state <- state.abb2[match(ili.data$region, state.name2)]
 ili.data       <- ili.data[, c("state", "week_start", "ilitotal", "total_patients")]
 ili.data       <- ili.data[!is.na(ili.data$total_patients),]
@@ -1412,7 +1419,7 @@ nrevvs.m <- melt(nrevvs.combo2[,c("flu_pct_adj",'state',"mmwr_week","mmwr_year")
 nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
 
 us.nv <- nrevvs.c[,,'US']
-matplot(us.nv[1:17,], type='l')
+matplot(us.nv[1:26,], type='l')
 #NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
 ```
 
@@ -1491,7 +1498,7 @@ provis.data.c1 <-
 provis.data.c1 <- 
   provis.data.c1[order(provis.data.c1$variable, provis.data.c1$epiwk),]
 
-write.csv(provis.data.c1, './outputs/provisional_deaths_reported_in_wk15.csv')
+write.csv(provis.data.c1, './outputs/provisional_deaths_reported_in_wk18.csv')
 
 provis.data.c <-
   provis.data.c1[complete.cases(provis.data.c1),]
@@ -1514,7 +1521,7 @@ diff <- all.deaths.provis$`2019-2020` -
 
 all.deaths.provis.eval <-
   all.deaths.provis[all.deaths.provis$Week >=10 &
-                      all.deaths.provis$Week<=15,]
+                      all.deaths.provis$Week<=16,]
 eval.sum <- apply(all.deaths.provis.eval[,-c(1:3)],2,sum)
 eval.sum['2019-2020'] - eval.sum['2018-2019']
 
