@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-11'
+  end.data.date: '2020-04-18'
 ---
 
 ```{r, include = F}
@@ -91,7 +91,7 @@ source('./functions/format_table.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(99999)) {
+runIfExpired <- function(storeName, f, maxage=hours(24)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -1410,7 +1410,7 @@ nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
 
 us.nv <- nrevvs.c[,,'US']
 matplot(us.nv[1:17,], type='l')
-(#NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
+#NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
 ```
 
 
@@ -1522,4 +1522,89 @@ eval.sum.comp <- apply(all.deaths.provis.eval.comp[,-c(1:3)],2,sum)
 eval.sum.comp['2019-2020'] - eval.sum.comp['2018-2019']
 
 ```
+
+
+```{r, fig.width=5, fig.height=5}
+#Further analyses of national all-cause data
+##This shows 1) deseasonalizing fluvar doesn't make a difference in national analysis (2) using a cyclic spline rather than harmonics to adjust seasonality doesn't make a difference (3) Models with flu fit better than models without during the training period (AIC)
+
+nat1 <- analysis.data2[analysis.data2$state=='US',]
+nat1$log.flu.lag1 <- as.numeric(scale(log(nat1$flu_pct_adj_lag1)))
+nat1$time <- 1:nrow(nat1)
+nat1$sin52 <- sin(2*pi*nat1$time/52.1775)
+nat1$sin26 <- sin(2*pi*nat1$time*2/52.1775)
+nat1$cos52 <- cos(2*pi*nat1$time/52.1775)
+nat1$cos26 <- cos(2*pi*nat1$time*2/52.1775)
+nat1$fit.ac <- nat1$nchs.total.deaths
+nat1$fit.ac[nat1$week_end>=as.Date('2020-02-01')] <-NA 
+nat1$year <- year(nat1$wk_date)
+nat1$week <- lubridate::week(nat1$wk_date)
+nat1$epiyr <- nat1$year
+nat1$epiyr[nat1$week<=26] <- nat1$year[nat1$week<=26]-1
+
+nat1$epiweek <- NA
+nat1$epiweek[nat1$week<=26] <-
+  nat1$week[nat1$week<=26] +26
+
+nat1$epiweek[nat1$week>=27] <-
+  nat1$week[nat1$week>=27] -26
+
+nat1.cf <- nat1
+nat1.cf$log.flu.lag1 <-
+  min(nat1$log.flu.lag1)
+
+
+library(MASS)
+mod1 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 + epiyr +log.flu.lag1, data=nat1)
+pred1 <- predict(mod1, type='response', newdata=nat1)
+pred1.cf <-predict(mod1, type='response', newdata=nat1.cf)
+
+mod2 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr, data=nat1)
+pred2 <- predict(mod2, type='response', newdata=nat1)
+
+library(mgcv)
+#Try adjusting for seasonality with a GAM instead
+mod3 <- gam(fit.ac~ s(epiweek, bs='cc') +epiyr + log.flu.lag1, data=nat1, family='poisson')
+pred3 <- predict(mod3, type='response', newdata=nat1)
+
+#Try to de-seasonalize flu first
+mod.flu <- glm(log.flu.lag1 ~ sin52 +cos52 +sin26 +cos26 +epiyr, data=nat1)
+pred.flu <- predict(mod.flu)
+nat1$log.flu.deseasonalize <- nat1$log.flu.lag1-pred.flu
+
+mod4 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +log.flu.deseasonalize, data=nat1)
+pred4 <- predict(mod4, type='response', newdata=nat1)
+
+
+plot(nat1$week_end, pred1, type='l', col='red', ylim=c(0, max(nat1$nchs.total.deaths)*1.2))
+points(nat1$week_end, pred2, type='l', col='blue')
+points(nat1$week_end, pred3, type='l', col='black')
+points(nat1$week_end, pred4, type='l', col='purple')
+
+
+plot(pred1, col='gray', type='l', ylim=c(0,max(pred1)))
+points(pred1.cf,col='red', type='l')
+#points(nat1$week_end, nat1$nchs.total.deaths, col='white')
+(sum(pred1) -sum(pred1.cf))/sum(pred1)
+
+nat1$fit.pic <- nat1$nchs.pic
+nat1$fit.pic[nat1$week_end>=as.Date('2020-02-01')] <-NA 
+nat1$logoffset <- log(nat1$nchs.total.deaths)
+nat1.cf$logoffset <-log(nat1$nchs.total.deaths)
+mod.pi1 <- glm.nb(fit.pic~ sin52 +cos52 +sin26 +cos26 +log.flu.lag1 +epiyr + offset(logoffset), data=nat1)
+pred.pi1 <- predict(mod.pi1, type='response', newdata=nat1)
+pred1.cf.cf <-predict(mod.pi1, type='response', newdata=nat1.cf)
+sum((pred.pi1-pred1.cf.cf))/sum(pred.pi1)
+
+
+mod.pi2 <- glm.nb(fit.pic~ sin52 +cos52 +sin26 +cos26 +epiyr + offset(logoffset), data=nat1)
+pred.pi2 <- predict(mod.pi2, type='response', newdata=nat1)
+
+plot(pred.pi1, type='l',col='black', ylim=c(0, max(nat1$nchs.pic)))
+points(pred.pi2, type='l', col='blue')
+points(nat1$nchs.pic,)
+
+```
+
+
 
