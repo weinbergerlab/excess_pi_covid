@@ -50,7 +50,20 @@ wk15 <-
   read.csv('./archives_do_not_sync/State_Custom_Data15.csv')
 wk15$max.date.report <- as.Date('2020-04-11')
 wk15$report.date <- as.Date('2020-04-17')
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15)
+
+wk16 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data16.csv')
+wk16$max.date.report <- as.Date('2020-04-18')
+wk16$report.date <- as.Date('2020-04-24')
+
+wk17 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data17.csv')
+wk17$max.date.report <- as.Date('2020-04-25')
+wk17$report.date <- as.Date('2020-05-01')
+
+
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17)
+
 
 all.reports$epiyr <-
   as.numeric(as.character(substr(all.reports$SEASON,1,4)))
@@ -97,11 +110,11 @@ new.reports[,-c(1:2)] <-
   
   })
 new.reports2 <- new.reports
-#count new reports
-#for(i in 2:4){
-# new.reports2[,(2+i)]  <- 
+# count new reports
+# for(i in 2:4){
+# new.reports2[,(2+i)]  <-
 #   new.reports[,(2+i)] - new.reports[,(2+i-1 )]
-#}
+# }
 
 new.reports2.m <- 
   melt(new.reports2, id.vars=c('state', 'death_date'))
@@ -118,7 +131,7 @@ new.reports2.m$time.report <-
   round(as.numeric(difftime(new.reports2.m$report_date,
      new.reports2.m$death_date,units='weeks') ))
 
-new.reports2.m$time.report[new.reports2.m$time.report>=5] <-5
+new.reports2.m$time.report[new.reports2.m$time.report>=8] <- 8
 
 new.reports2.m$time.report <-
   as.numeric(as.character(new.reports2.m$time.report))
@@ -154,8 +167,8 @@ date.fill1.spl <- lapply(date.fill1.spl, function(x){
   min.time.date <- 
     min( x$time.report, na.rm=T)
   
-  if(max.time.date < 5){
-    time.report2<-seq(from=min.time.date, to=5)
+  if(max.time.date < 8){
+    time.report2<-seq(from=min.time.date, to=8)
     date.rep <- rep(x$death_date, length(time.report2))
     date.time1 <-
       cbind.data.frame('time.report'=time.report2,
@@ -179,7 +192,7 @@ compare.m$time.report <-
   as.factor(compare.m$time.report)
 
 compare.m$time.report <-
-  relevel(compare.m$time.report,'5')
+  relevel(compare.m$time.report,'8')
 
 compare.m$t2 <- 
   as.numeric(difftime(compare.m$death_date,
@@ -206,7 +219,7 @@ inla.func <- function(state.select){
   ny1 <- cbind.data.frame(ny1, time.dummies[,-1])
   ny1$death_date.fac2 <- ny1$death_date.fac
   form1 <- 
-    as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 +  f(death_date.fac, model='ar1')")
+    as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 + time.report5 + time.report6 + time.report7 + f(death_date.fac, model='ar1')")
   dat.inla <- inla(form1, family='poisson',
      data=ny1,
      control.family=list(link='log'),
@@ -220,13 +233,13 @@ fixed.effect <- dat.inla$summary.fixed[,c('sd','0.025quant','0.5quant','0.975qua
 return(results1)
 }
 
-states.test <- c('Alabama','Arizona','Arkansas','Colorado', 'District of Columbia', 'Florida','Georgia','Idaho','Illinois','Indiana','Kansas','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','Montana','Nevada','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Washington')
+states.test <- c('Alabama','Arizona','Arkansas','Colorado', 'District of Columbia', 'Florida','Georgia','Idaho','Illinois','Indiana','Kansas','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','Montana','Nevada','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Texas', 'Washington')
 
 all.state.mods <-
   lapply(states.test,inla.func )
 ```
 
-```{r rr_fill_plot}
+```{r rr_fill_plot, fig.width=8, fig.height=8}
 #plot the RR
 plot.func.inla.rr <- function(inla.ds){
   dat.inla <- inla.ds$dat.inla
@@ -272,8 +285,19 @@ plot.func.inla.rr <- function(inla.ds){
     abline(v=as.Date('2020-04-03'), lty=3, col='gray')
 }
 
-par(mfrow=c(4,5), mar=c(2,4,1,1))
+par(mfrow=c(4,4), mar=c(2,4,1,1))
 lapply(all.state.mods, plot.func.inla.rr)
+
+```
+
+#predict inla
+```{r}
+linear.pred <- sapply(all.state.mods, function(x){
+  y <- x$dat.inla$"summary.linear.predictor"$'0.5quant'
+  return(y)
+}, simplify='array')
+
+plot(exp(linear.pred[,1]))
 
 ```
 
@@ -342,7 +366,7 @@ glmer.func <- function(state.select){
   ny1 <- cbind.data.frame(ny1, time.dummies[,-1])
   
   form1 <- 
-    as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 + (1|death_date.fac)")
+    as.formula("N_new_reports ~ sin52 + cos52 +sin26 + cos26 + epiyr + time.report1 +time.report2 +time.report3 +time.report4 + time.report5 +time.report6 +time.report7 + (1|death_date.fac)")
   mod1 <- glmer(form1, family='poisson',
      data=ny1)
               #examine the regular summary 
@@ -351,19 +375,19 @@ glmer.func <- function(state.select){
 return(results1)
 }
 
-states.test <- c('Alabama','Arizona','Arkansas','Colorado', 'District of Columbia', 'Florida','Georgia','Idaho','Illinois','Indiana','Kansas','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','Montana','Nevada','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Washington')
+states.test <- c('Alabama','Arizona','Florida','Georgia','Kentucky', 'Louisiana', 'Maryland','Massachusetts', 'Michigan','Minnesota','New Jersey', 'New York', 'New York City', 'Oregon','Pennsylvania','South Carolina','Virginia','Utah', 'Washington')
 
 glmer.mods <- lapply(states.test, glmer.func)
 
 fix.effs<-as.data.frame(sapply(glmer.mods, function(x) fixef(x$mod1)))
 names(fix.effs) <- states.test
-fix.effs <- fix.effs[c('time.report1','time.report2','time.report3','time.report4'),]
+fix.effs <- fix.effs[c('time.report1','time.report2','time.report3','time.report4','time.report5','time.report6','time.report7'),]
 ```
 
 Underreporting by state
 ```{r, fig.width=5, fig.height=5}
 #If values close to 1, this indicates the value is closer to the final value. the comparison is to 5+ weeks out 
-matplot(exp(fix.effs), type='l', xlab='Weeks since death', bty='l')
+matplot(exp(fix.effs), type='l', xlab='Weeks since death', bty='l', ylab='estimate reporting proportion')
 abline(h=1, lty=2, col='gray')
 ```
 
@@ -377,14 +401,15 @@ plot( fe.inla, as.matrix(fix.effs))
 
 week.pad <-sprintf("%02d", c(1:52))
 for(i in week.pad){
- for( j in c('2019-2020','2018-2019','2017-2018','2016-2017')){
-download.file(paste0('https://www.cdc.gov/flu/weekly/weeklyarchives', j,'/data/NCHSData',i,'.csv'),paste0('./Data/provisional_pi/provisional', j,'_','week_',i,'.csv'))
+ #for( j in c('2019-2020','2018-2019','2017-2018','2016-2017')){
+j='2019-2020'
+  download.file(paste0('https://www.cdc.gov/flu/weekly/weeklyarchives', j,'/data/NCHSData',i,'.csv'),paste0('./Data/provisional_pi/provisional', j,'_','week_',i,'.csv'))
   }
 }
 ```
 
 ```{r}
-week.test <- 15
+week.test <- '17' #week for which CDCfluview is for
 
 provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
                       function(x){
@@ -441,16 +466,18 @@ all.deaths.provis$Week <-
   as.numeric(as.character(all.deaths.provis$Week))
 
 cols1 <-c('#fdcc8a','#fc8d59','#e34a33','#b30000')
-matplot(all.deaths.provis$epiwk ,all.deaths.provis[,-c(1:3)], type='l', bty='l',col=cols1, main='Provisional deaths, reported in week 15', lty=1:4)
-legend('bottomleft',legend=names(all.deaths.provis[,-c(1:3)]),col=cols1, lty=1:4, ncol=2 )
+matplot(all.deaths.provis$epiwk ,all.deaths.provis[,c('2018-2019','2019-2020')], type='l', bty='l',col=cols1, main='Provisional deaths, reported in week 17', lty=1:4)
+legend('bottomleft',legend=names(all.deaths.provis[,c('2018-2019','2019-2020')]),col=cols1, lty=1:4, ncol=2 )
 
 diff <- all.deaths.provis$`2019-2020` -
   all.deaths.provis$`2018-2019`
 
 all.deaths.provis.eval <-
   all.deaths.provis[all.deaths.provis$Week >=10 &
-                      all.deaths.provis$Week<=14,]
+                      all.deaths.provis$Week<=15,]
 eval.sum <- apply(all.deaths.provis.eval[,-c(1:3)],2,sum)
+eval.sum['2019-2020'] - eval.sum['2018-2019']
+
 ```
 
 ```{r}
@@ -458,5 +485,225 @@ pneu.deaths.provis <-
   provis.data.c[provis.data.c$variable=='pi.deaths',]
 
 matplot(pneu.deaths.provis$epiwk ,pneu.deaths.provis[,-c(1:3)], type='l', bty='l')
+```
+
+## Jags model
+```{r}
+#Ignore reports from first week
+compare.m.alt <-   compare.m
+#compare.m.alt <-
+#  compare.m.alt[compare.m.alt$complete.weeks >=26,]
+
+
+#Filter if death date hasn't happened yet or happened a week ago
+compare.m.alt <-
+  compare.m.alt[as.numeric((compare.m.alt$report_date - compare.m.alt$death_date)) > 6,]
+
+
+#Split by state and death date
+compare.m.alt.spl <- 
+  split(compare.m.alt, paste0(compare.m.alt$state,compare.m.alt$death_date)) 
+
+#Sort by report date
+compare.m.alt.spl <- 
+  lapply(compare.m.alt.spl, function(x) x[order(x$report_date),])
+
+#Subtract previous value to calculate new value
+compare.m.alt.spl <- lapply(compare.m.alt.spl, function(x){
+  
+  #Remove rdundant rows if deaths was >6 months ago
+  if(max(x$complete.weeks)>=26){
+    x <-   x[1,]
+    x$complete.weeks <-999
+  }
+#Combine first and second weeks of observation
+  x$complete.weeks[x$complete.weeks==1] <-2
+  
+  x$new.reports <- x$N_deaths
+
+  if(nrow(x)>1){
+    #If first observation we have for a week s after week 2, put in the 'most complete' column 999
+    if(x$complete.weeks[1]>2){x$complete.weeks[1] <-999}
+    
+    for(i in 2:nrow(x)){
+       x$new.reports[i]<-x$N_deaths[i]-x$N_deaths[(i-1)]
+    }
+  }
+  return(x)
+}) 
+
+compare.m.alt.spl2 <-
+  do.call(rbind.data.frame,compare.m.alt.spl)
+#replace negative values with 0s
+compare.m.alt.spl2$new.reports[compare.m.alt.spl2$new.reports<0] <-0
+
+ds7 <- acast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state~ death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = sum)
+
+ds7.length <- acast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state~ death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = length)
+
+ds7[ds7.length==0] <-NA
+
+compare.c.alt <- dcast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state+death_date + complete.weeks~., value.var="new.reports" , fun.aggregate = sum)
+names(compare.c.alt) <-c('state', 'death_date','complete.weeks','new_reports')
+
+
+```
+
+```{r}
+#reshaoe for INLA
+
+d1 <- compare.c.alt[compare.c.alt$state=='Louisiana',]
+
+```
+
+
+## Param 1: model the new cases
+```{r}
+model_string_alt<-
+"model
+{
+  # Likelihood
+  for( t in 1:n.dates ){
+
+  for(d in 1:(D+1)){
+    n[t,d] ~ dpois(lambda[t,d] )
+  
+  log(lambda[t,d]) <- (int + beta.logged2[d] +
+                    sin26[t]*delta[1] +
+                    cos26[t]*delta[2] +
+                    sin52[t]*delta[3] +
+                    cos52[t]*delta[4] +
+                    alpha[t] + 
+                    phi[t]
+                    ) 
+  }
+    sum.n[t] <- sum(n[t,])
+  sum.lambda[t] <- sum(lambda[t,])
+  }
+  
+  # Prior for alpha
+  alpha[1] <-0
+  phi[1] <-0
+  for( t in 2:n.dates ){
+  alpha[t] ~ dnorm(alpha[t-1],alphatau.prec.prior)
+  phi[t] ~ dnorm(0, tau.disp)
+
+  }
+
+   ##  
+  int~dnorm(0, 1e-4)
+
+  ## Prior for beta
+  beta.logged <- log(beta)
+  beta.logged2 <- c(beta.logged,0)
+  beta ~ ddirch(beta.priors)
+  
+  tau.disp<- 1/sd.disp^2
+  sd.disp~dunif(0,100)
+  
+  # Prior for variance
+  alpha1.prec.prior<- 1/alpha1.sd.prior^2
+  alpha1.sd.prior~dunif(0,100)
+  
+  alphatau.prec.prior<- 1/alphatau.sd.prior^2
+  alphatau.sd.prior~dunif(0,100)
+  
+  for(i in 1:4){
+    delta[i] ~ dnorm(0,1e-4)
+  }
+}
+"
+
+
+```
+
+```{r}
+
+st1 <- ds7['Louisiana',,]
+date.sum <- apply(st1,1,sum, na.rm=T) #total observations for 
+death_date <- as.Date(dimnames(st1)[[1]])
+
+st2 <- st1[, -ncol(st1)] #remove column '99'
+week.index <- as.numeric(difftime(death_date, min(death_date), units='week'))
+sin52 <- sin(2*pi*week.index/52.1775)
+cos52 <- cos(2*pi*week.index/52.1775)
+
+sin26 <- sin(2*pi*week.index*2/52.1775)
+cos26 <- cos(2*pi*week.index*2/52.1775)
+
+beta.priors <- rep(0.1, times=(ncol(st2)))
+
+reporting.triangle <- st1
+
+reporting.triangle[reporting.triangle[,1]>0, ncol(reporting.triangle)] <-NA
+
+max_D <- ncol(reporting.triangle)-1
+
+
+library(rjags)
+library(HDInterval)
+##############################################################
+#Model Fitting
+##############################################################
+inits1=list(".RNG.seed"=c(123), ".RNG.name"='base::Wichmann-Hill')
+inits2=list(".RNG.seed"=c(456), ".RNG.name"='base::Wichmann-Hill')
+inits3=list(".RNG.seed"=c(789), ".RNG.name"='base::Wichmann-Hill')
+
+##############################################
+#Model Organization
+##############################################
+model_spec<-textConnection(model_string_alt)
+model_jags<-jags.model(model_spec, 
+                       inits=list(inits1,inits2, inits3),
+                       data=list('n.dates' =
+                                   nrow(reporting.triangle),
+                                 'n' = reporting.triangle,
+                                 'D' = ncol(reporting.triangle)-1,
+                                 'sin52'=sin52,
+                                 'sin26'=sin26,
+                                 'cos52'=cos52,
+                                 'cos26'=cos26,
+                           'beta.priors'=beta.priors
+                                 
+                                 ),
+                       n.adapt=10000, 
+                       n.chains=3)
+
+params<-c('sum.n','sum.lambda',
+          'phi','beta.logged')
+
+##############################################
+#Posterior Sampling
+##############################################
+posterior_samples<-coda.samples(model_jags, 
+                                params, 
+                                n.iter=5000)
+posterior_samples.all<-do.call(rbind,posterior_samples)
+#post1.summary<-summary(posterior_samples)
+#post_means<-colMeans(posterior_samples.all)
+post_means<-apply(posterior_samples.all, 2, median)
+sample.labs<-names(post_means)
+ci<-t(hdi(posterior_samples.all, credMass = 0.95))
+ci<-matrix(sprintf("%.1f",round(ci,1)), ncol=2)
+row.names(ci)<-sample.labs
+post_means<-sprintf("%.1f",round(post_means,1))
+names(post_means)<-sample.labs
+
+pred.index <- grep('sum.n',sample.labs)
+beta.index <- grep('beta.logged',sample.labs)
+
+pred.means <- post_means[pred.index]
+beta.log.means <- as.numeric(post_means[beta.index])
+probs <- exp(beta.log.means)
+
+pred.ci <- ci[pred.index,]
+all.preds<- cbind(pred.means, pred.ci)
+matplot(all.preds[,], type='l', lty=c(1,2,2), col=c('black','gray','gray'))
+points(date.sum[]*2, type='p',pch=16 ,col='red')
+```
+
+#US national data
+```{r}
+
 ```
 
