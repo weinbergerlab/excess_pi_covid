@@ -322,6 +322,9 @@ cdc.data$start_week <- NULL
 cdc.data$end_week <-
   as.Date(substr(cdc.data$end_week,1,10))
 
+most.recent <- max(cdc.data$data_as_of)
+cdc.data <- cdc.data[cdc.data$data_as_of==most.recent,]
+
 #Convert character to numeric
 cdc.data[,c('nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')] <- apply(cdc.data[,c('nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')],2, as.numeric)
 
@@ -1435,7 +1438,7 @@ matplot(fd.c[1:17,-1], type='l', col=col.plot, bty='l')
 ```{r, eval=F}
 ## Scrape old data from NCHS
 
-week.pad <-sprintf("%02d", c(1:52))
+week.pad <-sprintf("%02d", c(19:52))
 for(i in week.pad){
  #for( j in c('2019-2020','2018-2019','2017-2018','2016-2017')){
 j='2019-2020'
@@ -1445,7 +1448,7 @@ j='2019-2020'
 ```
 
 ```{r}
-week.test <- '17' #week for which CDCfluview is for
+week.test <- '18' #week for which CDCfluview is for
 
 provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
                       function(x){
