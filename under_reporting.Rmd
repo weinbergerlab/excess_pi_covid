@@ -28,9 +28,10 @@ library (RCurl)
 
 ```
 ## Backfilling
+#NOTE THE DATA ARE MISSING FOR JULY-OCT 2019
 
 ```{r}
-#Data from Andrew:NOTE: it looks like July-oct 2019 is missing from these data
+#Data from Andrew: NOTE: it looks like July-oct 2019 is missing from these data
 wk11 <- 
   read.csv('./archives_do_not_sync/State_Custom_Data11.csv')
 wk11$max.date.report <- as.Date('2020-03-14')
@@ -60,6 +61,11 @@ wk17 <-
   read.csv('./archives_do_not_sync/State_Custom_Data17.csv')
 wk17$max.date.report <- as.Date('2020-04-25')
 wk17$report.date <- as.Date('2020-05-01')
+
+wk18 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data18.csv')
+wk18$max.date.report <- as.Date('2020-05-02')
+wk18$report.date <- as.Date('2020-05-08')
 
 
 all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17)
@@ -138,7 +144,7 @@ new.reports2.m$time.report <-
 
 #filter observations when report date is before death date
 new.reports2.m <-
-  new.reports2.m[(new.reports2.m$time.report > 0 & new.reports2.m$report_date>=as.Date('2020-04-11')) | (new.reports2.m$time.report > 1 & new.reports2.m$report_date<as.Date('2020-04-11')) 
+  new.reports2.m[(new.reports2.m$time.report > 0 & new.reports2.m$report_date>=as.Date('2020-04-25')) | (new.reports2.m$time.report > 1 & new.reports2.m$report_date<as.Date('2020-04-25')) 
                    ,] 
 
 new.reports2.m <-
@@ -178,10 +184,14 @@ compare.m.alt.spl <- lapply(compare.m.alt.spl, function(x){
   x$complete.weeks[x$complete.weeks==1] <-2
   
   x$new.reports <- x$N_deaths
+      x$first.week.measured<-x$complete.weeks[1]
 
   if(nrow(x)>1){
+    
     #If first observation we have for a week s after week 2, put in the 'most complete' column 999
-    if(x$complete.weeks[1]>2){x$complete.weeks[1] <-999}
+    if(x$complete.weeks[1]>2){
+      x$complete.weeks[1] <-999
+      }
     
     for(i in 2:nrow(x)){
        x$new.reports[i]<-x$N_deaths[i]-x$N_deaths[(i-1)]
@@ -199,19 +209,21 @@ ds7 <- acast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.r
 
 ds7.length <- acast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state~ death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = length)
 
+#If we don't have observation, set to NA
 ds7[ds7.length==0] <-NA
 
 compare.c.alt <- dcast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state+death_date + complete.weeks~., value.var="new.reports" , fun.aggregate = sum)
 names(compare.c.alt) <-c('state', 'death_date','complete.weeks','new_reports')
 
+#what is first week for which we have a report for each state? For dates where we don't have >26 weeks of data and don't observed the first week, we need to sum th eprobabilities (betas)
+first.measured.date <- as.data.frame(unique(compare.m.alt.spl2[,c('death_date','first.week.measured')]))
 
-```
+max.measured <- max(first.measured.date$first.week.measured[first.measured.date$first.week.measured!=999])
 
-```{r}
-#reshaoe for INLA
+first.measured.date$first.week.measured[first.measured.date$first.week.measured==999] <- max.measured+1
 
-d1 <- compare.c.alt[compare.c.alt$state=='Louisiana',]
-
+#get rid of columns where we don't have a meausurement
+ds7 <- ds7[,,c(1:max.measured, dim(ds7)[3])]
 ```
 
 
@@ -222,52 +234,62 @@ model_string_alt<-
 {
   # Likelihood
   for( t in 1:n.dates ){
-
   for(d in 1:(D+1)){
-    n[t,d] ~ dpois(lambda[t,d] )
   
-  log(lambda[t,d]) <- (int + beta.logged2[d] +
+  n[t,d] ~ dpois(lambda[t,d])
+  
+  log(lambda[t,d]) <- (int +     
+            beta.logged2[d]*step(D-d) +
+            sum.beta.logged2[t]*(1-step(D-d)) +
                     sin26[t]*delta[1] +
                     cos26[t]*delta[2] +
                     sin52[t]*delta[3] +
                     cos52[t]*delta[4] +
-                    alpha[t] + 
-                    phi[t]
+                    phi[t] 
                     ) 
   }
-    sum.n[t] <- sum(n[t,])
-  sum.lambda[t] <- sum(lambda[t,])
+    log(expected[t])<- 
+        (int +      sin26[t]*delta[1] +
+                    cos26[t]*delta[2] +
+                    sin52[t]*delta[3] +
+                    cos52[t]*delta[4] +
+                    phi[t] 
+           )
+    log(baseline[t])<- 
+        (int +      sin26[t]*delta[1] +
+                    cos26[t]*delta[2] +
+                    sin52[t]*delta[3] +
+                    cos52[t]*delta[4] 
+           )
+  sum.n[t] ~ dpois(expected[t])
+  sum.lambda[t] <- expected[t]
   }
-  
-  # Prior for alpha
-  alpha[1] <-0
-  phi[1] <-0
-  for( t in 2:n.dates ){
-  alpha[t] ~ dnorm(alpha[t-1],alphatau.prec.prior)
-  phi[t] ~ dnorm(0, tau.disp)
 
+   #AR1 Random Effect
+  phi[1] ~ dnorm(alpha1.mean.prior, alpha1.prec.prior)
+  for(t in 2:n.dates){
+     phi[t] ~ dnorm(phi[t-1],tau2.alpha)
   }
-
+     
+     
    ##  
-  int~dnorm(0, 1e-4)
+  int~dnorm(0, 1e-2)
 
   ## Prior for beta
   beta.logged <- log(beta)
   beta.logged2 <- c(beta.logged,0)
   beta ~ ddirch(beta.priors)
   
-  tau.disp<- 1/sd.disp^2
-  sd.disp~dunif(0,100)
-  
+  for( t in 1:n.dates ){
+    sum.beta[t] <- sum(beta[1:N.first.obs[t]])
+    sum.beta.logged2[t] <- log(sum.beta[t])
+  }
+
   # Prior for variance
-  alpha1.prec.prior<- 1/alpha1.sd.prior^2
-  alpha1.sd.prior~dunif(0,100)
-  
-  alphatau.prec.prior<- 1/alphatau.sd.prior^2
-  alphatau.sd.prior~dunif(0,100)
+  tau2.alpha ~ dgamma(alphat.shape.prior,alphat.rate.prior)
   
   for(i in 1:4){
-    delta[i] ~ dnorm(0,1e-4)
+    delta[i] ~ dnorm(0,1e-2)
   }
 }
 "
@@ -289,7 +311,7 @@ cos52 <- cos(2*pi*week.index/52.1775)
 sin26 <- sin(2*pi*week.index*2/52.1775)
 cos26 <- cos(2*pi*week.index*2/52.1775)
 
-beta.priors <- rep(0.1, times=(ncol(st2)))
+beta.priors <- rep(1, times=(ncol(st2)))
 
 reporting.triangle <- st1
 
@@ -307,6 +329,7 @@ inits1=list(".RNG.seed"=c(123), ".RNG.name"='base::Wichmann-Hill')
 inits2=list(".RNG.seed"=c(456), ".RNG.name"='base::Wichmann-Hill')
 inits3=list(".RNG.seed"=c(789), ".RNG.name"='base::Wichmann-Hill')
 
+
 ##############################################
 #Model Organization
 ##############################################
@@ -321,14 +344,19 @@ model_jags<-jags.model(model_spec,
                                  'sin26'=sin26,
                                  'cos52'=cos52,
                                  'cos26'=cos26,
+                                 alphat.shape.prior=0.001,
+                                alphat.rate.prior=0.001,
+                                alpha1.mean.prior=0,
+                                alpha1.prec.prior=0.001,
+                'N.first.obs'=(first.measured.date$first.week.measured-1),
                            'beta.priors'=beta.priors
                                  
                                  ),
-                       n.adapt=10000, 
+                       n.adapt=4000, 
                        n.chains=3)
 
 params<-c('sum.n','sum.lambda',
-          'phi','beta.logged')
+          'beta.logged', 'alpha', 'phi', 'baseline')
 
 ##############################################
 #Posterior Sampling
@@ -347,17 +375,29 @@ row.names(ci)<-sample.labs
 post_means<-sprintf("%.1f",round(post_means,1))
 names(post_means)<-sample.labs
 
-pred.index <- grep('sum.n',sample.labs)
-beta.index <- grep('beta.logged',sample.labs)
+pred.index <- grep('sum.lambda',sample.labs)
+pred.index2 <- grep('sum.n',sample.labs)
 
-pred.means <- post_means[pred.index]
+beta.index <- grep('beta.logged',sample.labs)
+alpha.index <- grep('alpha',sample.labs)
+baseline.index <- grep('baseline',sample.labs)
+phi.index <- grep('phi',sample.labs)
+
+pred.means <- post_means[pred.index2]
 beta.log.means <- as.numeric(post_means[beta.index])
 probs <- exp(beta.log.means)
 
-pred.ci <- ci[pred.index,]
-all.preds<- cbind(pred.means, pred.ci)
-matplot(all.preds[,], type='l', lty=c(1,2,2), col=c('black','gray','gray'))
-points(date.sum[]*2, type='p',pch=16 ,col='red')
+alpha <- as.numeric(post_means[alpha.index])
+
+baseline <- as.numeric(post_means[baseline.index])
+
+phi <- as.numeric(post_means[phi.index])
+
+pred.ci <- ci[pred.index2,]
+all.preds<- as.numeric(as.character(cbind(pred.means, pred.ci)))
+all.preds<- matrix(all.preds,ncol=3)
+matplot(all.preds[350:ncol(all.preds),], type='l', lty=c(1,2,2), col=c('black','gray','gray'))
+points(date.sum[350:ncol(all.preds)], type='p',pch=16 ,col='red')
 ```
 
 #US national data
