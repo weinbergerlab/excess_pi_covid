@@ -24,7 +24,8 @@ library(readr)
 library(gsubfn)
 library(INLA)
 library (RCurl)
-
+library(rjags)
+library(HDInterval)
 
 ```
 ## Backfilling
@@ -68,6 +69,23 @@ wk18$max.date.report <- as.Date('2020-05-02')
 wk18$report.date <- as.Date('2020-05-08')
 
 
+#Read in national data
+
+provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18'),
+                      function(x){
+  d1 <- read.csv(paste0('./Data/provisional_pi/provisional', '2019-2020','_','week_',x,'.csv'))
+  names(d1) <- toupper(names(d1))
+  d1$week.death <- MMWRweek2Date(d1$YEAR, d1$WEEK) + days (6)
+  d1$max.date.report <- max(d1$week.death)
+  d1$report.date <- MMWRweek2Date(max(d1$YEAR), as.numeric(x)) + days(12)
+  d1$SUB.AREA <- 'US'
+  d1$epiyr <- d1$YEAR
+  d1$epiyr[d1$WEEK<=26] <- d1$YEAR[d1$WEEK<=26] - 1
+  return(d1)
+    })
+
+nat.reports <- do.call('rbind.data.frame',provis.list)
+
 all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17)
 
 
@@ -93,7 +111,15 @@ all.reports$TOTAL.DEATHS <-
   gsub(',','',all.reports$TOTAL.DEATHS) 
 all.reports$TOTAL.DEATHS <-  as.numeric(as.character(all.reports$TOTAL.DEATHS))
 
-compare.m <- melt(all.reports[,c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS" )], id.vars  =c("week.death",'SUB.AREA',"report.date"))
+nat.reports2 <- 
+  nat.reports[, c('week.death','SUB.AREA','report.date', 'ALL.DEATHS')]
+names(nat.reports2) <- c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS")
+
+all.reports2 <- rbind.data.frame(all.reports[,c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS") ], nat.reports2)
+```
+
+```{r}
+compare.m <- melt(all.reports2[,c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS" )], id.vars  =c("week.death",'SUB.AREA',"report.date"))
 
 names(compare.m) <- 
   c('death_date','state','report_date','variable','N_deaths')
@@ -116,11 +142,7 @@ new.reports[,-c(1:2)] <-
   
   })
 new.reports2 <- new.reports
-# count new reports
-# for(i in 2:4){
-# new.reports2[,(2+i)]  <-
-#   new.reports[,(2+i)] - new.reports[,(2+i-1 )]
-# }
+
 
 new.reports2.m <- 
   melt(new.reports2, id.vars=c('state', 'death_date'))
@@ -205,25 +227,6 @@ compare.m.alt.spl2 <-
 #replace negative values with 0s
 compare.m.alt.spl2$new.reports[compare.m.alt.spl2$new.reports<0] <-0
 
-ds7 <- acast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state~ death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = sum)
-
-ds7.length <- acast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state~ death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = length)
-
-#If we don't have observation, set to NA
-ds7[ds7.length==0] <-NA
-
-compare.c.alt <- dcast( compare.m.alt.spl2[,c('death_date','state','complete.weeks',"new.reports" )], state+death_date + complete.weeks~., value.var="new.reports" , fun.aggregate = sum)
-names(compare.c.alt) <-c('state', 'death_date','complete.weeks','new_reports')
-
-#what is first week for which we have a report for each state? For dates where we don't have >26 weeks of data and don't observed the first week, we need to sum th eprobabilities (betas)
-first.measured.date <- as.data.frame(unique(compare.m.alt.spl2[,c('death_date','first.week.measured')]))
-
-max.measured <- max(first.measured.date$first.week.measured[first.measured.date$first.week.measured!=999])
-
-first.measured.date$first.week.measured[first.measured.date$first.week.measured==999] <- max.measured+1
-
-#get rid of columns where we don't have a meausurement
-ds7 <- ds7[,,c(1:max.measured, dim(ds7)[3])]
 ```
 
 
@@ -234,6 +237,9 @@ model_string_alt<-
 {
   # Likelihood
   for( t in 1:n.dates ){
+     
+    n.train[t] ~dpois(baseline[t])
+    
   for(d in 1:(D+1)){
   
   n[t,d] ~ dpois(lambda[t,d])
@@ -241,40 +247,50 @@ model_string_alt<-
   log(lambda[t,d]) <- (int +     
             beta.logged2[d]*step(D-d) +
             sum.beta.logged2[t]*(1-step(D-d)) +
-                    sin26[t]*delta[1] +
-                    cos26[t]*delta[2] +
-                    sin52[t]*delta[3] +
-                    cos52[t]*delta[4] +
-                    phi[t] +disp[t]
+                    sin26[t]*delta1[1] +
+                    cos26[t]*delta1[2] +
+                    sin52[t]*delta1[3] +
+                    cos52[t]*delta1[4] +
+                    epsilon1[epiyr.index[t]] +
+                    phi[t] 
                     ) 
   }
     log(expected[t])<- 
-        (int +      sin26[t]*delta[1] +
-                    cos26[t]*delta[2] +
-                    sin52[t]*delta[3] +
-                    cos52[t]*delta[4] +
-                    phi[t] +disp[t]
+        (int +      sin26[t]*delta1[1] +
+                    cos26[t]*delta1[2] +
+                    sin52[t]*delta1[3] +
+                    cos52[t]*delta1[4] +
+                    epsilon1[epiyr.index[t]] +
+                    phi[t] 
            )
-     log(baseline[t])<- 
-         (int +      sin26[t]*delta[1] +
-                     cos26[t]*delta[2] +
-                     sin52[t]*delta[3] +
-                     cos52[t]*delta[4] 
-            )
+           
+    #baseline is just standard harmonic reg, fit to train period     
+    log(baseline[t])<- 
+        (int +      sin26[t]*delta2[1] +
+                    cos26[t]*delta2[2] +
+                    sin52[t]*delta2[3] +
+                    cos52[t]*delta2[4] +
+                    epsilon2[epiyr.index[t]] )
+    
   sum.n[t] ~ dpois(expected[t])
   sum.lambda[t] <- expected[t]
+
+  baseline.n[t] ~ dpois(baseline[t])
+
+  excessN[t] <- sum.n[t] - baseline.n[t]
   }
 
-   #AR1 Random Effect
-   phi[1] <-0
-
-   disp[1] <- 0
-
+    #Time Series Random Effect
+  phi[1] ~ dnorm(0, sigma2_phi_inv)
   for(t in 2:n.dates){
-     phi[t] ~ dnorm(phi[t-1],tau2.alpha)
-     disp[t] ~ dnorm(0,tau.disp)
+     phi[t] ~ dnorm((alpha*phi[t-1]), sigma2_phi_inv)
+     }
 
-  }
+  #Hyper-Prior Distributions
+  sigma2_phi_inv <- 1/(sigma_phi*sigma_phi)
+  sigma_phi ~ dunif(0, 1000)
+
+  alpha ~ dunif(0,1)
      
      
    ##  
@@ -297,7 +313,15 @@ model_string_alt<-
   tau2.alpha ~ dgamma(alphat.shape.prior,alphat.rate.prior)
   
   for(i in 1:4){
-    delta[i] ~ dnorm(0,1e-4)
+    delta1[i] ~ dnorm(0,1e-4)
+    delta2[i] ~ dnorm(0,1e-4)
+
+  }
+  
+  for(k in 1:n.epiyr){
+  epsilon1[k]~dnorm(0,1e-4)
+  epsilon2[k]~dnorm(0,1e-4)
+
   }
 }
 "
@@ -307,9 +331,36 @@ model_string_alt<-
 
 ```{r}
 
-st1 <- ds7['Massachusetts',,]
+ds.select <- compare.m.alt.spl2[compare.m.alt.spl2$state=='US',]
+
+ds7 <- acast( ds.select[,c('death_date','complete.weeks',"new.reports" )],  death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = sum)
+
+ds7.length <- acast( ds.select[,c('death_date','complete.weeks',"new.reports" )],  death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = length)
+
+#If we don't have observation, set to NA
+ds7[ds7.length==0] <-NA
+
+
+#what is first week for which we have a report for each state? For dates where we don't have >26 weeks of data and don't observed the first week, we need to sum th eprobabilities (betas)
+first.measured.date <- as.data.frame(unique(ds.select[,c('death_date','first.week.measured')]))
+
+max.measured <- max(first.measured.date$first.week.measured[first.measured.date$first.week.measured!=999])
+
+first.measured.date$first.week.measured[first.measured.date$first.week.measured==999] <- max.measured+1
+
+#get rid of columns where we don't have a meausurement
+ds7 <- ds7[,c(1:max.measured, dim(ds7)[2])]
+
+st1 <- ds7
 date.sum <- apply(st1,1,sum, na.rm=T) #total observations for 
 death_date <- as.Date(dimnames(st1)[[1]])
+death_yr <- year(death_date)
+death_week <- week(death_date)
+death_epiyr <- death_yr
+
+death_epiyr[death_week<=26] <- 
+  death_yr[death_week<=26]-1
+death_epiyr.index <-as.numeric(as.factor(death_epiyr))
 
 st2 <- st1[, -ncol(st1)] #remove column '99'
 week.index <- as.numeric(difftime(death_date, min(death_date), units='week'))
@@ -328,8 +379,11 @@ reporting.triangle[reporting.triangle[,1]>0, ncol(reporting.triangle)] <-NA
 max_D <- ncol(reporting.triangle)-1
 
 
-library(rjags)
-library(HDInterval)
+n.train <- 
+  reporting.triangle[,ncol(reporting.triangle)]
+
+n.train[death_date>=as.Date('2020-02-01')] <- NA
+
 ##############################################################
 #Model Fitting
 ##############################################################
@@ -352,6 +406,9 @@ model_jags<-jags.model(model_spec,
                                  'sin26'=sin26,
                                  'cos52'=cos52,
                                  'cos26'=cos26,
+                                 'epiyr.index'=death_epiyr.index,            'n.epiyr'=max(death_epiyr.index),
+                                 'n.train'=n.train,
+                                 
                                  alphat.shape.prior=0.001,
                                 alphat.rate.prior=0.001,
                                 alpha1.mean.prior=0,
@@ -360,11 +417,11 @@ model_jags<-jags.model(model_spec,
                            'beta.priors'=beta.priors
                                  
                                  ),
-                       n.adapt=3000, 
+                       n.adapt=10000, 
                        n.chains=3)
 
 params<-c('sum.n','sum.lambda',
-         'beta.logged', 'alpha', 'phi', 'baseline','sum.beta')
+         'beta.logged', 'alpha', 'phi','sum.beta','baseline.n','excessN')
 
 ##############################################
 #Posterior Sampling
@@ -389,8 +446,9 @@ pred.index2 <- grep('sum.n',sample.labs)
 
 beta.index <- grep('beta.logged',sample.labs)
 alpha.index <- grep('alpha',sample.labs)
-baseline.index <- grep('baseline',sample.labs)
+baseline.index <- grep('baseline.n',sample.labs)
 phi.index <- grep('phi',sample.labs)
+excess.index <- grep('excessN',sample.labs)
 
 pred.means <- post_means[pred.index]
 beta.log.means <- as.numeric(post_means[beta.index])
@@ -400,17 +458,24 @@ alpha <- as.numeric(post_means[alpha.index])
 
 baseline <- as.numeric(post_means[baseline.index])
 
+excess <- as.numeric(post_means[excess.index])
+
+
 phi <- as.numeric(post_means[phi.index])
 
 pred.ci <- ci[pred.index,]
 all.preds<- as.numeric(as.character(cbind(pred.means, pred.ci)))
 all.preds<- matrix(all.preds,ncol=3)
-matplot(all.preds[350:nrow(all.preds),], type='l', lty=c(1,2,2), col=c('black','gray','gray'))
-points(date.sum[350:nrow(all.preds)], type='p',pch=16 ,col='red')
+matplot(all.preds[1:nrow(all.preds),], type='l', lty=c(1,2,2), col=c('black','gray','gray'))
+points(date.sum[1:nrow(all.preds)], type='p',pch=16 ,col='red')
+points(baseline[1:nrow(all.preds)], type='l' ,col='blue')
+
+
+diff <- all.preds[,1]-date.sum
+
 ```
 
-#US national data
-```{r}
-
+```{r, fig.width=10, fig.height=10}
+plot(posterior_samples)
 ```
 
