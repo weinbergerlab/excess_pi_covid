@@ -1396,6 +1396,7 @@ delays <- delays[,,commn.states]
 delays <- delays[,1:10000,]
 delays.m <- melt(delays)
 names(delays.m) <- c('time.since.death','iter','state','prop')
+delays.med <- apply(delays,c (1,3),median)
 
 obs.unadj <- as.data.frame(obs.unadj)
 obs.unadj$week_end <- ds[[1]]$`1`$US$date + days(6)
@@ -1415,11 +1416,17 @@ obs.adj1.sum <-
 obs.adj1.sum.c <-
   acast(obs.adj1.sum[,c('iter','state','N_death.adj')],iter~state, value.var='N_death.adj')
 
+obs.unadj1.sum.c <-
+  acast(obs.adj1.sum[,c('iter','state','N_death')],iter~state, value.var='N_death')
+
 #Check column align
 colnames(sum.pred.iter.unadj) ==colnames(obs.adj1.sum.c)
 
 excess.adj <- obs.adj1.sum.c - sum.pred.iter.unadj[,,1]
 excess.adj.q <- t(apply(excess.adj,2, quantile, probs=c(0.025, 0.5,0.975)))
+
+excess.unadj <- obs.unadj1.sum.c - sum.pred.iter.unadj[,,1]
+excess.unadj.q <- t(apply(excess.unadj,2, quantile, probs=c(0.025, 0.5,0.975)))
 
 sum.cases.excess.unadj <- sapply(1:length(sum.obs.state.unadj),
                            function(x){
