@@ -73,22 +73,23 @@ wk18$report.date <- as.Date('2020-05-08')
 
 #Read in national data
 
+
 provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18'),
                       function(x){
   d1 <- read.csv(paste0('./Data/provisional_pi/provisional', '2019-2020','_','week_',x,'.csv'))
   names(d1) <- toupper(names(d1))
   d1$week.death <- MMWRweek2Date(d1$YEAR, d1$WEEK) + days (6)
   d1$max.date.report <- max(d1$week.death)
-  d1$report.date <- MMWRweek2Date(max(d1$YEAR), as.numeric(x)) + days(12)
+ # d1$report.date <- d1$max.date.report + days(12)
+  d1$report.date <- mmwr_week_to_date(2020,week= as.numeric(x))+ days(12)
   d1$SUB.AREA <- 'US'
   d1$epiyr <- d1$YEAR
   d1$epiyr[d1$WEEK<=26] <- d1$YEAR[d1$WEEK<=26] - 1
   return(d1)
     })
-
 nat.reports <- do.call('rbind.data.frame',provis.list)
 
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17)
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18)
 
 
 all.reports$epiyr <-
@@ -131,59 +132,21 @@ compare.m$death_date <-as.Date(compare.m$death_date)
 
 compare.m$complete.weeks <- round(as.vector(difftime(compare.m$report_date,
           compare.m$death_date, units='weeks')))
-#compare.m$complete.weeks[compare.m$complete.weeks>5] <-5
 
 compare.c <- dcast( compare.m[,c('death_date','state','report_date','N_deaths')], state+ death_date ~ report_date, value.var='N_deaths', fun.aggregate = mean)
 
 
-new.reports <- compare.c
-new.reports[,-c(1:2)] <- 
-  apply(new.reports[,-c(1:2)],2, function(x){ 
-    x[is.nan(x)] <- 0 
-    return(x)
-  
-  })
-new.reports2 <- new.reports
-
-
-new.reports2.m <- 
-  melt(new.reports2, id.vars=c('state', 'death_date'))
-
-names(new.reports2.m) <- c('state','death_date', 'report_date','N_new_reports')
-
-new.reports2.m$death_date <- 
-  as.Date( new.reports2.m$death_date)
-
-new.reports2.m$report_date <- 
-  as.Date( new.reports2.m$report_date)
-
-new.reports2.m$time.report <-
-  round(as.numeric(difftime(new.reports2.m$report_date,
-     new.reports2.m$death_date,units='weeks') ))
-
-new.reports2.m$time.report[new.reports2.m$time.report>=8] <- 8
-
-new.reports2.m$time.report <-
-  as.numeric(as.character(new.reports2.m$time.report))
-
-#filter observations when report date is before death date
-new.reports2.m <-
-  new.reports2.m[(new.reports2.m$time.report > 0 & new.reports2.m$report_date>=as.Date('2020-04-25')) | (new.reports2.m$time.report > 1 & new.reports2.m$report_date<as.Date('2020-04-25')) 
-                   ,] 
-
-new.reports2.m <-
-  new.reports2.m[new.reports2.m$time.report>0,] 
-
-new.reports2.m$N_new_reports[new.reports2.m$N_new_reports<0] <- 0
 ```
 
 
 ## Set up reporting triangle
 ```{r}
 #Ignore reports from first week
-compare.m.alt <-   compare.m
-
 #Filter if death date hasn't happened yet or happened a week ago
+#Ignore reports from first week
+compare.m.alt <-   compare.m
+compare.m.alt <-
+  compare.m.alt[compare.m.alt$complete.weeks<=26,]
 compare.m.alt <-
   compare.m.alt[as.numeric((compare.m.alt$report_date - compare.m.alt$death_date)) > 6,]
 
@@ -194,21 +157,38 @@ compare.m.alt.spl <-
 
 #Sort by report date
 compare.m.alt.spl <- 
-  lapply(compare.m.alt.spl, function(x) x[order(x$report_date),])
+  lapply(compare.m.alt.spl, function(x){
+    x[order(x$report_date),]
+    })
 
 #Subtract previous value to calculate new value
 compare.m.alt.spl <- lapply(compare.m.alt.spl, function(x){
   
-  #Remove rdundant rows if deaths was >6 months ago
-  if(max(x$complete.weeks)>=26){
-    x <-   x[1,]
+  #Remove redundant rows if deaths was >6 months ago
+    #If no observations before 26 weeks, just take last obs
+  if(max(x$complete.weeks)==26 & min(x$complete.weeks)==26){
+    x <-   x[nrow(x),] #take most complete observation
     x$complete.weeks <-999
   }
+  
+    #If some observations before and after 26 weeks
+
+  if(max(x$complete.weeks)==26 & min(x$complete.weeks)<=26){
+    x$wk26 <-0
+    x$wk26[x$complete.weeks>=26] <-1
+    x.early<-x[x$wk26==0,]  
+    x.late <-x[x$wk26==1,]  
+    x.late <-   x.late[nrow(x.late),, drop=F] #take most complete observation
+    #x.late$complete.weeks <- 999
+    x <- rbind.data.frame(x.early, x.late)
+    x$wk26 <- NULL
+  }
+  
 #Combine first and second weeks of observation
   x$complete.weeks[x$complete.weeks==1] <-2
   
   x$new.reports <- x$N_deaths
-      x$first.week.measured<-x$complete.weeks[1]
+  x$first.week.measured<- x$complete.weeks[1]
 
   if(nrow(x)>1){
     
@@ -229,13 +209,21 @@ compare.m.alt.spl2 <-
 #replace negative values with 0s
 compare.m.alt.spl2$new.reports[compare.m.alt.spl2$new.reports<0] <-0
 
+us.test <- compare.m.alt.spl2[compare.m.alt.spl2$state=='US',]
+unique(us.test$first.week.measured)
+unique(us.test$complete.weeks)
+
 ```
 
 
 ## read in model
 ```{r}
-source('./functions/jags_poisson.R')
+#source('./functions/jags_poisson.R')
+source('./functions/jags_poisson2.R')
+
 source('./functions/jags_negbin.R')
+source('./functions/jags_negbin2.R')
+source('./functions/jags_negbin4.R')
 
 
 ```
@@ -244,15 +232,19 @@ source('./functions/jags_negbin.R')
 jags.func <- function(state.select){
 ds.select <- compare.m.alt.spl2[compare.m.alt.spl2$state==state.select,]
 
-ds7 <- acast( ds.select[,c('death_date','complete.weeks',"new.reports" )],  death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = sum)
+ds.select$complete.weeks[ds.select$complete.weeks>26] <-999
 
-ds7.length <- acast( ds.select[,c('death_date','complete.weeks',"new.reports" )],  death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = length)
+ds.select$first.week.measured[ds.select$first.week.measured>26] <-26
+
+ds7 <- acast( ds.select[,c('death_date','complete.weeks',"new.reports", 'first.week.measured' )],  death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = sum)
+
+ds7.length <- acast( ds.select[,c('death_date','complete.weeks',"new.reports", 'first.week.measured' )],  death_date ~ complete.weeks, value.var="new.reports" , fun.aggregate = length)
 
 #If we don't have observation, set to NA
 ds7[ds7.length==0] <-NA
 
-
 #what is first week for which we have a report for each state? For dates where we don't have >26 weeks of data and don't observed the first week, we need to sum th eprobabilities (betas)
+
 first.measured.date <- as.data.frame(unique(ds.select[,c('death_date','first.week.measured')]))
 
 max.measured <- max(first.measured.date$first.week.measured[first.measured.date$first.week.measured!=999])
@@ -260,7 +252,7 @@ max.measured <- max(first.measured.date$first.week.measured[first.measured.date$
 first.measured.date$first.week.measured[first.measured.date$first.week.measured==999] <- max.measured+1
 
 #get rid of columns where we don't have a meausurement
-ds7 <- ds7[,c(1:max.measured, dim(ds7)[2])]
+#ds7 <- ds7[,c(1:max.measured, dim(ds7)[2])]
 
 st1 <- ds7
 date.sum <- apply(st1,1,sum, na.rm=T) #total observations for 
@@ -274,23 +266,14 @@ death_epiyr[death_week<=26] <-
 death_epiyr.index <-as.numeric(as.factor(death_epiyr))
 
 st2 <- st1[, -ncol(st1)] #remove column '99'
-week.index <- as.numeric(difftime(death_date, min(death_date), units='week'))
-sin52 <- sin(2*pi*week.index/52.1775)
-cos52 <- cos(2*pi*week.index/52.1775)
 
-sin26 <- sin(2*pi*week.index*2/52.1775)
-cos26 <- cos(2*pi*week.index*2/52.1775)
-
-beta.priors <- rep(1, times=(ncol(st2)))
+beta.priors <- rep(0.1, times=(ncol(st2)))
 
 reporting.triangle <- st1
 
 reporting.triangle[reporting.triangle[,1]>0, ncol(reporting.triangle)] <-NA
 
 max_D <- ncol(reporting.triangle)-1
-
-n.train <-  date.sum
-n.train[death_date>=as.Date('2020-02-01')] <- NA
 
 ##############################################################
 #Model Fitting
@@ -303,32 +286,26 @@ inits3=list(".RNG.seed"=c(789), ".RNG.name"='base::Wichmann-Hill')
 ##############################################
 #Model Organization
 ##############################################
-model_spec<-textConnection(model_string_pois)
+model_spec<-textConnection(model_string_negbin4)
 model_jags<-jags.model(model_spec, 
                        inits=list(inits1,inits2, inits3),
                        data=list('n.dates' =
                                    nrow(reporting.triangle),
                                  'n' = reporting.triangle,
                                  'D' = ncol(reporting.triangle)-1,
-                                 'sin52'=sin52,
-                                 'sin26'=sin26,
-                                 'cos52'=cos52,
-                                 'cos26'=cos26,
-                                 'epiyr.index'=death_epiyr.index,            'n.epiyr'=max(death_epiyr.index),
-                                 'n.train'=n.train,
+                                                    
                                  
                                  alphat.shape.prior=0.001,
                                 alphat.rate.prior=0.001,
-                                                alpha1.prec.prior=0.001,
                 'N.first.obs'=(first.measured.date$first.week.measured-1),
                            'beta.priors'=beta.priors
                                  
                                  ),
-                       n.adapt=10000, 
+                       n.adapt=5000, 
                        n.chains=3)
 
 params<-c('sum.n','sum.lambda',
-         'beta.logged', 'alpha', 'phi','sum.beta','baseline.n','excessN')
+         'beta.logged', 'alpha','sum.beta')
 
 ##############################################
 #Posterior Sampling
@@ -339,12 +316,16 @@ posterior_samples<-coda.samples(model_jags,
 posterior_samples.all<-do.call(rbind,posterior_samples)
 #post1.summary<-summary(posterior_samples)
 #post_means<-colMeans(posterior_samples.all)
-return(posterior_samples.all)
+out.list=list('posterior_samples.all'=posterior_samples.all,'date.sum'=date.sum,'death_date'=death_date)
+return(out.list)
 }
 ```
 
-```{r}
-n_cores<- detectCores() -1 
+```{r, eval=F}
+#states.test <-'US'
+#mod1 <-jags.func('US')
+
+n_cores<- detectCores() -1
 states.test <- unique(compare.m.alt.spl2$state)
 
   cl <- makeCluster(n_cores)
@@ -353,60 +334,93 @@ states.test <- unique(compare.m.alt.spl2$state)
     library(reshape2, quietly = TRUE)
     library(rjags, quietly = TRUE)
 })
-  clusterExport(cl, c('jags.func','compare.m.alt.spl2','model_string_pois'), environment())
-  
+  clusterExport(cl, c('jags.func','compare.m.alt.spl2','model_string_negbin4'), environment())
+
 mod1<-pblapply(cl = cl,X=states.test,FUN=jags.func)
-  
+
 stopCluster(cl)
+names(mod1) <- states.test
+saveRDS(mod1,'./jags_results/mod1.rds')
+
+
 ```
 
 
+```{r}
+jags_extract <- function(ds){
+
+  posterior_samples.all <- ds$posterior_samples.all
+  
+  death_date <- ds$death_date
+  
+  date.sum <- ds$date.sum
+  
+  post_means<-apply(posterior_samples.all, 2, median)
+  sample.labs<-names(post_means)
+  
+  ci<-t(hdi(posterior_samples.all, credMass = 0.95))
+  ci<-matrix(sprintf("%.1f",round(ci,1)), ncol=2)
+  row.names(ci)<-sample.labs
+  post_means<-sprintf("%.1f",round(post_means,1))
+  names(post_means)<-sample.labs
+  
+  #pred.index <- grep('sum.lambda',sample.labs)
+  pred.index2 <- grep('sum.n',sample.labs)
+  
+  beta.index <- grep('beta.logged',sample.labs)
+  alpha.index <- grep('alpha',sample.labs)
+  baseline.index <- grep('baseline.n',sample.labs)
+  sum.lambda.index <- grep('sum.lambda',sample.labs)
+  
+  pred.means <- post_means[pred.index2]
+  lambda.means <- post_means[sum.lambda.index]
+  
+  beta.log.means <- as.numeric(post_means[beta.index])
+  probs <- exp(beta.log.means)
+  probs.samps <- posterior_samples.all[,beta.index]
+  alpha <- as.numeric(post_means[alpha.index])
+  
+  pred.ci <- ci[pred.index2,]
+  all.preds<- as.numeric(as.character(cbind(pred.means, pred.ci)))
+  all.preds<- as.data.frame(matrix(all.preds,ncol=3))
+  names(all.preds) <- c('pred.med','pred.lcl','preds.ucl')
+  
+  all.preds <- cbind.data.frame(all.preds, 'obs'=date.sum, 'death_date'=death_date)
+  
+  out.list=list('preds'=all.preds,'probs'=probs,'probs.samps'=probs.samps )
+  return(out.list)
+}
+
+res1 <- lapply(mod1, jags_extract)
+all.preds1 <- lapply(res1,'[[', 'preds')
+
+prop.report.wk <- sapply(res1,'[[', 'probs')
+complete.wk <- apply(prop.report.wk, 2,cumsum)
+complete.wk <- cbind.data.frame('week'=2:(nrow(complete.wk)+1), complete.wk)
+write.csv(complete.wk,'./outputs/NobBs.complete.csv')
+
+matplot(complete.wk$week, complete.wk[,-1], type='l')
+
+prop.report.wk.iter <- sapply(res1,'[[', 'probs.samps', simplify='array')
+complete.wk.iter <- apply(prop.report.wk.iter, c(1,3),cumsum)
+dimnames(complete.wk.iter)[[1]] <- 2:(dim(complete.wk.iter)[1]+1)
+saveRDS(complete.wk.iter,'./outputs/NobBs.complete.iters.csv')
+```
+
 
 ```{r}
-post_means<-apply(posterior_samples.all, 2, median)
-sample.labs<-names(post_means)
 
-ci<-t(hdi(posterior_samples.all, credMass = 0.95))
-ci<-matrix(sprintf("%.1f",round(ci,1)), ncol=2)
-row.names(ci)<-sample.labs
-post_means<-sprintf("%.1f",round(post_means,1))
-names(post_means)<-sample.labs
+par(mfrow=c(4,4), mar=c(2,2,1,1))
+for(i in 1:length(all.preds1)){
+ds.plot <- all.preds1[[i]]
+ds.plot <- ds.plot[ds.plot$death_date>=as.Date('2020-03-01'),]
+state <- names(all.preds1)[i]
 
-pred.index <- grep('sum.lambda',sample.labs)
-pred.index2 <- grep('sum.n',sample.labs)
-
-beta.index <- grep('beta.logged',sample.labs)
-alpha.index <- grep('alpha',sample.labs)
-baseline.index <- grep('baseline.n',sample.labs)
-phi.index <- grep('phi',sample.labs)
-excess.index <- grep('excessN',sample.labs)
-
-pred.means <- post_means[pred.index]
-beta.log.means <- as.numeric(post_means[beta.index])
-probs <- exp(beta.log.means)
-
-alpha <- as.numeric(post_means[alpha.index])
-
-baseline <- as.numeric(post_means[baseline.index])
-
-excess <- as.numeric(post_means[excess.index])
-
-
-phi <- as.numeric(post_means[phi.index])
-
-pred.ci <- ci[pred.index,]
-baseline.ci <- ci[baseline.index,]
-excess.ci <- ci[excess.index,]
-all.preds<- as.numeric(as.character(cbind(pred.means, pred.ci)))
-all.preds<- matrix(all.preds,ncol=3)
-index <-400:nrow(all.preds)
-matplot(all.preds[400:nrow(all.preds),], type='l', lty=c(1,2,2), col=c('black','gray','gray'))
-points(date.sum[400:nrow(all.preds)], type='p',pch=16 ,col='red')
-points(baseline[400:nrow(all.preds)], type='l' ,col='blue')
-#polygon(c(1:length(index), rev(1:length(index))), c(baseline.ci[400:nrow(all.preds),1], rev(baseline.ci[400:nrow(all.preds),2])) )
-
-
-diff <- all.preds[,1]-date.sum
+yrange <- range(c(ds.plot$pred.med,ds.plot$obs))
+plot(ds.plot$death_date,ds.plot$pred.med, type='l', lty=c(1,2,2), col=c('black','gray','gray'), ylim=yrange, main=state)
+points(ds.plot$death_date,ds.plot$obs, type='p',pch=16 ,col='red')
+polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(ds.plot$preds.ucl)), col=rgb(0,0,1,alpha=0.1) )
+}
 
 ```
 
