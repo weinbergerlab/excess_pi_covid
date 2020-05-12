@@ -15,7 +15,7 @@ output:
   pdf_document: 
     keep_tex:  true
 params:
-  agg.level: 'state_region'
+  agg.level: 'state'
   n.days.filter: 20
   web.version: FALSE
   extrap.date: '2020-01-26'
@@ -91,7 +91,7 @@ source('./functions/format_table.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(24)) {
+runIfExpired <- function(storeName, f, maxage=hours(12)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -318,6 +318,8 @@ names(cdc.data) <-
   c('data_as_of','start_week', 'end_week', 'group', 'state','indicator','nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')
 
 cdc.data$start_week <- NULL
+
+data.vintage <- as.Date(substr(unique(cdc.data$data_as_of),1,10))
 
 cdc.data$end_week <-
   as.Date(substr(cdc.data$end_week,1,10))
@@ -1428,6 +1430,7 @@ htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to p
 
 ```
 
+  
 ## Table S2: Do not adjust for flu: all-cause
 
 ```{r, include=F} 
@@ -1462,6 +1465,92 @@ sum.obs.unadj <-
 
 sum.obs.state.unadj <- apply(sum.obs.unadj,2,sum)
 
+#Adjustment factors calculated with modified NoBBS..see other RMD
+obs.unadj <-
+    excessExtract(ds = ds,
+                syndrome = 'nchs.total.deaths',
+                extract.quantity = "y")
+obs.unadj <- obs.unadj[,,1]
+states1.match <- dimnames(obs.unadj)[[2]]
+
+delays <- readRDS('./outputs/NobBs.complete.iters.rds')
+dimnames(delays)[[3]][dimnames(delays)[[3]]=='US'] <- 'United States'
+dimnames(delays)[[3]] <-
+  state.abb2[match(dimnames(delays)[[3]] , state.name2)]
+states2.match <- dimnames(delays)[[3]]
+commn.states <- Reduce(intersect, list(states1.match,states2.match))
+delays <- delays[,,commn.states]
+delays <- delays[,1:10000,]
+delays.m <- melt(delays)
+names(delays.m) <- c('time.since.death','iter','state','prop')
+delays.med <- apply(delays,c (1,3),median)
+
+obs.unadj <- as.data.frame(obs.unadj)
+obs.unadj$week_end <- ds[[1]]$`1`$US$date + days(6)
+obs.unadj <- obs.unadj[obs.unadj$week_end >= as.Date(params$count.start.date),]
+#First data here is 3.5 weeks after..let's call it 4 weeks to be conservative (adjust less)
+obs.unadj$time.since.death <- ceiling(difftime(as.Date(data.vintage), obs.unadj$week_end,units='weeks'))
+obs.unadj.m <- melt(obs.unadj, id.vars=c('week_end', 'time.since.death'))
+names(obs.unadj.m) <- 
+  c('week_end','time.since.death','state','N_death')
+
+obs.adj1 <- merge(obs.unadj.m,delays.m, by=c('state', 'time.since.death'))
+obs.adj1$N_death.adj <- obs.adj1$N_death/obs.adj1$prop
+
+obs.adj1.sum <- 
+  aggregate(obs.adj1[,c('N_death', 'N_death.adj')], by=list('state'=obs.adj1$state, 'iter'=obs.adj1$iter),FUN=sum)
+
+obs.adj1.sum.c <-
+  acast(obs.adj1.sum[,c('iter','state','N_death.adj')],iter~state, value.var='N_death.adj')
+
+obs.unadj1.sum.c <-
+  acast(obs.adj1.sum[,c('iter','state','N_death')],iter~state, value.var='N_death')
+
+#Check column align
+colnames(sum.pred.iter.unadj) ==colnames(obs.adj1.sum.c)
+
+excess.adj <- obs.adj1.sum.c - sum.pred.iter.unadj[,,1]
+excess.adj.q <- t(apply(excess.adj,2, quantile, probs=c(0.025, 0.5,0.975)))
+
+excess.unadj <- obs.unadj1.sum.c - sum.pred.iter.unadj[,,1]
+excess.unadj.q <- t(apply(excess.unadj,2, quantile, probs=c(0.025, 0.5,0.975)))
+
+##NOTE: Should NOT use reporting delay for entire US..each state reports differently
+#BC NY dominates 
+obs.adj1.sum.all.states <-aggregate(obs.adj1[!(obs.adj1$state %in% c('US',exclude.states)),c('N_death', 'N_death.adj')], by=list( 'iter'=obs.adj1$iter[!(obs.adj1$state %in% c('US',exclude.states))]),FUN=sum)
+
+sum.pred.iter.unadj.al.state <-apply( sum.pred.iter.unadj[,-which(dimnames(sum.pred.iter.unadj)[[2]] %in% c('US',exclude.states)),1],1, sum)
+
+excess.allstates <- obs.adj1.sum.all.states$N_death.adj -
+  sum.pred.iter.unadj.al.state
+
+excess.allstates.adj <- obs.adj1.sum.all.states$N_death.adj -
+  sum.pred.iter.unadj.al.state
+excess.allstates.adj.q <- quantile(excess.allstates.adj,probs=c(0.025,0.5,0.975))
+
+#check to make sure this lines up with raw estimate--it does
+excess.allstates.unadj <- obs.adj1.sum.all.states$N_death -
+  sum.pred.iter.unadj.al.state
+excess.allstates.unadj.q <- quantile(excess.allstates.unadj,probs=c(0.025,0.5,0.975))
+
+excess.allstates.adj.q <- matrix(excess.allstates.adj.q, nrow=1)
+row.names(excess.allstates.adj.q) <-'US'
+excess.adj.q2 <- 
+  excess.adj.q[!(row.names(excess.adj.q) %in% c('US',exclude.states)),]
+
+excess.adj.q2 <- rbind(excess.adj.q2,excess.allstates.adj.q)
+formatted.ac.delay.adj <- 
+  paste0(round(excess.adj.q2[,'50%'],-1),
+                      ' (' ,
+                      round(excess.adj.q2[,'2.5%'],-1), ',' ,
+                      round(excess.adj.q2[,'97.5%'],-1), ')'
+                      )
+formatted.ac.delay.adj <-
+  cbind.data.frame('state'=row.names(excess.adj.q2),formatted.ac.delay.adj)
+
+###################
+
+
 sum.cases.excess.unadj <- sapply(1:length(sum.obs.state.unadj),
                            function(x){
   sum.obs.state.unadj[x] -  sum.pred.iter.unadj[,x,1]
@@ -1474,7 +1563,7 @@ sum.excess.deaths.range.ac.unadj <- cbind.data.frame('state'=unique(analysis.dat
 
 formatted.ac.unadj <- 
   paste0(round(sum.excess.deaths.range.ac.unadj[,'50%'],-1),
-                      '(' ,
+                      ' (' ,
                       round(sum.excess.deaths.range.ac.unadj[,'2.5%'],-1), ',' ,
                       round(sum.excess.deaths.range.ac.unadj[,'97.5%'],-1), ')'
                       )
@@ -1482,7 +1571,7 @@ formatted.ac.unadj <- cbind.data.frame('state'=sum.excess.deaths.range.ac.unadj$
 
 formatted.ac.adj <- 
   paste0(round(sum.excess.deaths.range.ac[,'50%'],-1),
-                      '(' ,
+                      ' (' ,
                       round(sum.excess.deaths.range.ac[,'2.5%'],-1), ',' ,
                       round(sum.excess.deaths.range.ac[,'97.5%'],-1), ')'
                       )
@@ -1490,11 +1579,29 @@ formatted.ac.adj <-
 formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.ac.adj)
 
 summary.table.adj.unadj <- merge(formatted.ac.adj,formatted.ac.unadj, by='state')
+summary.table.adj.unadj <- merge(summary.table.adj.unadj,formatted.ac.delay.adj, by='state')
 
-names(summary.table.adj.unadj) <- c('State', 'Excess deaths, adjusted for influenza','Excess deaths, unadjusted for influenza')
-htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to any cause, as estimated from a regression that adjusts for influenza with a regression that does not')
+names(summary.table.adj.unadj) <- c('State', 'Excess deaths, adjusted for influenza','Excess deaths, unadjusted for influenza', 'Excess deaths, adjusted for reporting delay,n not influenza')
+htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to any cause, as estimated from a regression that adjusts for influenza with a regression that does not, with or without adjustments for reporting delays')
 
 ```
+
+```{r, eval=F}
+#Plot flu positivity this year vs previous years
+vs.date <- mmwr_week(nrevvs.combo$wk_date)
+nrevvs.combo2 <- cbind.data.frame(nrevvs.combo,vs.date)
+nrevvs.m <- melt(nrevvs.combo2[,c("flu_pct_adj",'state',"mmwr_week","mmwr_year")], id.vars=c("mmwr_week","mmwr_year",'state'))
+nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
+
+us.nv <- nrevvs.c[,,'US']
+matplot(us.nv[1:26,], type='l')
+#NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
+```
+
+```{r, fig.s5}
+matplot(2:(nrow(delays.med)+1),delays.med, type='l', bty='l', ylab='Proportion reported', xlab='Weeks after death')
+```
+
 
 ```{r, eval=F}
 #Plot flu positivity this year vs previous years
