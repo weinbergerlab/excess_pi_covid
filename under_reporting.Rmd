@@ -404,7 +404,7 @@ write.csv(complete.wk,'./outputs/NobBs.complete.csv')
 matplot(complete.wk$week, complete.wk[,-1], type='l')
 
 prop.report.wk.iter <- sapply(res1,'[[', 'probs.samps', simplify='array')
-complete.wk.iter <- apply(prop.report.wk.iter, c(1,3),cumsum)
+complete.wk.iter <- apply(prop.report.wk.iter, c(1,3),function(x) cumsum(exp(x)))
 dimnames(complete.wk.iter)[[1]] <- 2:(dim(complete.wk.iter)[1]+1)
 saveRDS(complete.wk.iter,'./outputs/NobBs.complete.iters.rds')
 ```
