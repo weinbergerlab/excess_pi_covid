@@ -103,7 +103,23 @@ days.sub[days.sub==7] <- 0
 last.fri <- as.character(Sys.Date() - days.sub)
 
 fri.date <- paste0(substr(last.fri,6,7),substr(last.fri,9,10),substr(last.fri,1,4))
-download.file(paste0('https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',fri.date, '/csv/nchs-mortality-report.csv'),'./Data/pic_provisional/pic.provisional.txt')
+
+runIfExpired('',download_pic){
+  download_pic <- function() {
+    download.file(
+      paste0(
+        'https://www.cdc.gov/coronavirus/2019-ncov/covid-data/covidview/',
+        fri.date,
+        '/csv/nchs-mortality-report.csv'
+      ),
+      './Data/pic_provisional/pic.provisional.txt'
+    )
+    ds1 <- read.txt('./Data/pic_provisional/pic.provisional.txt')
+    
+    return(ds1)
+  }
+  download_pic()
+}
 ```
 
 ```{r states_to_plot}
