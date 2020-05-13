@@ -1509,10 +1509,12 @@ obs.unadj1.sum.c <-
 #Check column align
 colnames(sum.pred.iter.unadj) ==colnames(obs.adj1.sum.c)
 
-excess.adj <- obs.adj1.sum.c - sum.pred.iter.unadj[,,1]
+sum.pred.iter.unadj.state.select <- sum.pred.iter.unadj[,colnames(obs.adj1.sum.c),1]
+
+excess.adj <- obs.adj1.sum.c - sum.pred.iter.unadj.state.select
 excess.adj.q <- t(apply(excess.adj,2, quantile, probs=c(0.025, 0.5,0.975)))
 
-excess.unadj <- obs.unadj1.sum.c - sum.pred.iter.unadj[,,1]
+excess.unadj <- obs.unadj1.sum.c - sum.pred.iter.unadj.state.select
 excess.unadj.q <- t(apply(excess.unadj,2, quantile, probs=c(0.025, 0.5,0.975)))
 
 ##NOTE: Should NOT use reporting delay for entire US..each state reports differently
@@ -1548,6 +1550,11 @@ formatted.ac.delay.adj <-
 formatted.ac.delay.adj <-
   cbind.data.frame('state'=row.names(excess.adj.q2),formatted.ac.delay.adj)
 
+if(params$agg.level=='state_region'){
+  formatted.ac.delay.adj <-
+    formatted.ac.delay.adj[formatted.ac.delay.adj$state!='US',]
+}
+
 ###################
 
 
@@ -1581,7 +1588,7 @@ formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,fo
 summary.table.adj.unadj <- merge(formatted.ac.adj,formatted.ac.unadj, by='state')
 summary.table.adj.unadj <- merge(summary.table.adj.unadj,formatted.ac.delay.adj, by='state')
 
-names(summary.table.adj.unadj) <- c('State', 'Excess deaths, adjusted for influenza','Excess deaths, unadjusted for influenza', 'Excess deaths, adjusted for reporting delay,n not influenza')
+names(summary.table.adj.unadj) <- c('State', 'Excess deaths, adjusted for influenza','Excess deaths, unadjusted for influenza', 'Excess deaths, adjusted for reporting delay, not influenza')
 htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to any cause, as estimated from a regression that adjusts for influenza with a regression that does not, with or without adjustments for reporting delays')
 
 ```
