@@ -415,13 +415,13 @@ saveRDS(complete.wk.iter,'./outputs/NobBs.complete.iters.rds')
 par(mfrow=c(4,4), mar=c(2,2,1,1))
 for(i in 1:length(all.preds1)){
 ds.plot <- all.preds1[[i]]
-ds.plot <- ds.plot[ds.plot$death_date>=as.Date('2020-03-01'),]
+ds.plot <- ds.plot[ds.plot$death_date>=as.Date('2020-01-01'),]
 state <- names(all.preds1)[i]
 
 yrange <- range(c(ds.plot$pred.med,ds.plot$obs))
 plot(ds.plot$death_date,ds.plot$pred.med, type='l', lty=c(1,2,2), col=c('black','gray','gray'), ylim=yrange, main=state)
 points(ds.plot$death_date,ds.plot$obs, type='p',pch=16 ,col='red')
-polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(ds.plot$preds.ucl)), col=rgb(0,0,1,alpha=0.1) )
+polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(ds.plot$preds.ucl)), col=rgb(0,0,1,alpha=0.1), border=F )
 }
 
 ```
