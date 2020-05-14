@@ -436,7 +436,10 @@ yrange <- range(c(ds.plot$pred.med,ds.plot$obs))
 plot(ds.plot$death_date,ds.plot$pred.med, type='l', lty=c(1,2,2), col=c('black','gray','gray'), ylim=yrange, main=state)
 points(ds.plot$death_date,ds.plot$obs, type='l',pch=16 ,col='red', lty=2)
 polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(ds.plot$preds.ucl)), col=rgb(0,0,1,alpha=0.1), border=F )
+abline(v=as.Date('2020-04-18'), lty=2, col='gray')
+
 }  
+
 
 ```
 
@@ -444,12 +447,24 @@ polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(
 ```{r}
 
 check1.m <- melt(compare.m[,c('state','death_date','report_date', 'N_deaths')], id.vars=c('state','death_date','report_date'))
+check1.m$time.report <- as.numeric(check1.m$report_date - check1.m$death_date)
+check1.m <- check1.m[check1.m$time.report>7,]
 check1.c <- acast(check1.m, state~death_date~report_date)
 dates1 <- as.Date(dimnames(check1.c)[[2]])
 check2 <- check1.c[,dates1 >=as.Date('2020-01-01'),]
 dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
-matplot(dates2 ,check2['Louisiana',,], type='l', bty='l', xaxt='n', xlab='', ylab='Provisional Count')
-axis(side=1, at=seq.Date(from=min(dates2), to=max(dates2), length.out=length(dates2)), label=dates2)
 
+plot.states <- c('Oregon', 'Louisiana', 'New York', 'Florida')
+par(mfrow=c(2,2))
+for(i in plot.states){
+  check3 <- check2[i,,]
+  dates1 <- as.Date(dimnames(check3)[[1]])
+check3 <- check3[dates1 >=as.Date('2020-01-01'),]
+dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
+  dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
+matplot(dates2 ,check3, type='l', bty='l', xaxt='n', xlab='', ylab='Provisional Count', main=i)
+axis(side=1, at=seq.Date(from=min(dates2), to=max(dates2), length.out=length(dates2)), label=dates2)
+abline(v=as.Date('2020-04-18'))
+}
 ```
 
