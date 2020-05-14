@@ -403,6 +403,13 @@ jags_extract <- function(ds){
 res1 <- lapply(mod1, jags_extract)
 all.preds1 <- lapply(res1,'[[', 'preds')
 
+for(i in 1:length(all.preds1)){
+  all.preds1[[i]]$state <- names(all.preds1)[i]
+}
+
+all.preds.df <- do.call('rbind.data.frame', all.preds1)
+write.csv(all.preds.df,'./outputs/NobBs.preds.csv')
+
 prop.report.wk <- sapply(res1,'[[', 'probs')
 complete.wk <- apply(prop.report.wk, 2,cumsum)
 complete.wk <- cbind.data.frame('week'=2:(nrow(complete.wk)+1), complete.wk)
@@ -430,6 +437,19 @@ plot(ds.plot$death_date,ds.plot$pred.med, type='l', lty=c(1,2,2), col=c('black',
 points(ds.plot$death_date,ds.plot$obs, type='l',pch=16 ,col='red', lty=2)
 polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(ds.plot$preds.ucl)), col=rgb(0,0,1,alpha=0.1), border=F )
 }  
+
+```
+
+#As a check, let's look at the backfilling patterns for certain states
+```{r}
+
+check1.m <- melt(compare.m[,c('state','death_date','report_date', 'N_deaths')], id.vars=c('state','death_date','report_date'))
+check1.c <- acast(check1.m, state~death_date~report_date)
+dates1 <- as.Date(dimnames(check1.c)[[2]])
+check2 <- check1.c[,dates1 >=as.Date('2020-01-01'),]
+dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
+matplot(dates2 ,check2['Louisiana',,], type='l', bty='l', xaxt='n', xlab='', ylab='Provisional Count')
+axis(side=1, at=seq.Date(from=min(dates2), to=max(dates2), length.out=length(dates2)), label=dates2)
 
 ```
 
