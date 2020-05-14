@@ -37,9 +37,7 @@ model_string_negbin4<-
   beta ~ ddirch(beta.priors)
   
   for( t in 1:n.dates ){
-    #N.first.obs.adj[t] <-N.first.obs[t] + (1-step(N.first.obs[t]-1.5)) #if first obs=1
-    
-    #sum.beta[t] <- sum(beta[1:(N.first.obs.adj[t]-1) ])
+
     sum.beta[t] <- sum(beta[1:(N.first.obs[t]) ])
 
     sum.beta.logged2[t] <- log(sum.beta[t])
