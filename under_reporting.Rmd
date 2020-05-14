@@ -228,6 +228,12 @@ source('./functions/jags_negbin4.R')
 
 ```
 
+
+```{r}
+exclude.states <- c('Connecticut','North Carolina','US')
+compare.m.alt.spl2 <- compare.m.alt.spl2[!(compare.m.alt.spl2$state %in% exclude.states),]
+```
+
 ```{r}
 jags.func <- function(state.select){
 ds.select <- compare.m.alt.spl2[compare.m.alt.spl2$state==state.select,]
@@ -327,6 +333,7 @@ return(out.list)
 
 n_cores<- detectCores() -1
 states.test <- unique(compare.m.alt.spl2$state)
+#states.test <- c('New York', 'California', 'Louisiana', 'Georgia', 'Florida','Kentucky')
 
   cl <- makeCluster(n_cores)
   clusterEvalQ(cl, {
@@ -420,9 +427,9 @@ state <- names(all.preds1)[i]
 
 yrange <- range(c(ds.plot$pred.med,ds.plot$obs))
 plot(ds.plot$death_date,ds.plot$pred.med, type='l', lty=c(1,2,2), col=c('black','gray','gray'), ylim=yrange, main=state)
-points(ds.plot$death_date,ds.plot$obs, type='p',pch=16 ,col='red')
+points(ds.plot$death_date,ds.plot$obs, type='l',pch=16 ,col='red', lty=2)
 polygon(c(ds.plot$death_date, rev(ds.plot$death_date)), c(ds.plot$pred.lcl, rev(ds.plot$preds.ucl)), col=rgb(0,0,1,alpha=0.1), border=F )
-}
+}  
 
 ```
 
