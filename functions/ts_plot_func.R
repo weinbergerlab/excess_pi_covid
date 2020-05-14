@@ -1,9 +1,12 @@
-ts.plot.func <-function(ds.plot=jh3,ylim.adj=0.7, death.var='deaths' ,states.plot=states.cdc ){
+ts.plot.func <-function(ds.plot=jh3,ylim.adj=0.7, death.var='deaths' ,states.plot=states.cdc , plot.order=F ){
   
   max.test.all.state<-max(ds.plot$test.week.per.capita, na.rm=T)
  
 for(i in plot.state.indices){
   #print(i)
+  if(plot.order){
+    states.cdc = states.plot
+  }
   ds.select <- ds.plot[ds.plot$state==states.cdc[i],]
   max.test.this.state <- max(ds.select$test.week.per.capita, na.rm=T)
   ave_pi <- mean(ds.select$pneumonia_influenza_covid, na.rm=T)
