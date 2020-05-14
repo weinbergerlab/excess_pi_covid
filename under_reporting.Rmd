@@ -219,10 +219,10 @@ unique(us.test$complete.weeks)
 ## read in model
 ```{r}
 #source('./functions/jags_poisson.R')
-source('./functions/jags_poisson2.R')
+#source('./functions/jags_poisson2.R')
 
-source('./functions/jags_negbin.R')
-source('./functions/jags_negbin2.R')
+#source('./functions/jags_negbin.R')
+#source('./functions/jags_negbin2.R')
 source('./functions/jags_negbin4.R')
 
 
