@@ -1510,15 +1510,23 @@ obs.unadj1.sum.c <-
 obs.adj1.sum.wk  <- 
   acast(obs.adj1[,c('iter','state','week_end','N_death.adj')],iter~week_end~state, value.var='N_death.adj')
 
-obs.adj1.sum.wk.q <- 
-    apply(obs.adj1.sum.wk,c(2,3), quantile, probs=c(0.025,0.5,0.975))
+#str <- 
+#    apply(obs.adj1.sum.wk,c(2,3), quantile, probs=c(0.025,0.5,0.975))
 
 obs.unadj1.sum.wk  <- 
   acast(obs.adj1[,c('iter','state','week_end','N_death')],iter~week_end~state, value.var='N_death')
 
-obs.adj1.sum.wk.q <- 
+obs.unadj1.sum.wk.q <- 
     apply(obs.unadj1.sum.wk,c(2,3), quantile, probs=c(0.025,0.5,0.975))
 
+obs.adj1.sum.wk.q <- 
+    apply(obs.adj1.sum.wk,c(2,3), quantile, probs=c(0.025,0.5,0.975))
+
+#Output time series
+obs.adj1.sum.wk.q.m <- melt(obs.adj1.sum.wk.q)
+obs.adj1.sum.wk.q.c <- dcast( obs.adj1.sum.wk.q.m, Var3+Var2~Var1)
+names(obs.adj1.sum.wk.q.c) <- c('state','week_end','delay.adj.count.lcl','delay.adj.count.med','delay.adj.count.ucl')
+write.csv(obs.adj1.sum.wk.q.c,'./outputs/delay.adjusted.counts.csv')
 
 
 #Check column align
