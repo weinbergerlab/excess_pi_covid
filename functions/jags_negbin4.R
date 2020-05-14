@@ -17,7 +17,7 @@ model_string_negbin4<-
     }
    
     sum.lambda[t] <- sum(lambda[t,1:D])
-    sum.n[t]  <- sum(n[t,1:D])
+    sum.n[t]  <- sum(n[t,N.first.obs[t]:D]) + step(N.first.obs[t]-1.5)*n[t,(D+1)]
   }
 
    alpha[1] ~ dnorm(0, 0.001)
