@@ -17,7 +17,10 @@ model_string_negbin4<-
     }
    
     sum.lambda[t] <- sum(lambda[t,1:D])
-    sum.n[t]  <- sum(n[t,N.first.obs[t]:D]) + step(N.first.obs[t]-1.5)*n[t,(D+1)]
+    
+    #If D=1 is not observed, use column D+1 and (N.first.obs+1):D first obs is in col D+1
+    sum.n[t]  <- (1-step(N.first.obs[t]-1.5))*sum(n[t,(1:D)]) + 
+            step(N.first.obs[t]-1.5)*(n[t,(D+1)] +sum(n[t,(N.first.obs[t]+1):D]))
   }
 
    alpha[1] ~ dnorm(0, 0.001)
@@ -34,7 +37,11 @@ model_string_negbin4<-
   beta ~ ddirch(beta.priors)
   
   for( t in 1:n.dates ){
-    sum.beta[t] <- sum(beta[1:N.first.obs[t]])
+    #N.first.obs.adj[t] <-N.first.obs[t] + (1-step(N.first.obs[t]-1.5)) #if first obs=1
+    
+    #sum.beta[t] <- sum(beta[1:(N.first.obs.adj[t]-1) ])
+    sum.beta[t] <- sum(beta[1:(N.first.obs[t]) ])
+
     sum.beta.logged2[t] <- log(sum.beta[t])
   }
 
