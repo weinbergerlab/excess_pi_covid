@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: "Dan Weinberger"
-date: "5/5/2020"
+date: "5/15/2020"
 output:
   html_document:
     df_print: paged
@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-18'
+  end.data.date: '2020-04-25'
 ---
 
 ```{r, include = F}
@@ -1198,7 +1198,7 @@ j='2019-2020'
 
 ```{r fig.s1, fig.width=10, fig.height=4}
 par(mfrow=c(1,2))
-for(week.test in c('11','18')){ #week for which CDCfluview is for
+for(week.test in c('11','19')){ #week for which CDCfluview is for
 
 
 provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
@@ -1263,17 +1263,25 @@ diff <- all.deaths.provis$`2019-2020` -
 
 all.deaths.provis.eval <-
   all.deaths.provis[all.deaths.provis$Week >=10 &
-                      all.deaths.provis$Week<=16,]
+                      all.deaths.provis$Week<=17,]
 eval.sum <- apply(all.deaths.provis.eval[,-c(1:3)],2,sum)
 eval.sum['2019-2020'] - eval.sum['2018-2019']
 
 all.deaths.provis.eval.comp <-
-  all.deaths.provis[all.deaths.provis$Week >=3 &
+  all.deaths.provis[all.deaths.provis$Week >=2 &
                       all.deaths.provis$Week<=9,]
 eval.sum.comp <- apply(all.deaths.provis.eval.comp[,-c(1:3)],2,sum)
 eval.sum.comp['2019-2020'] - eval.sum.comp['2018-2019']
 }
 ```
+Comparison of excess deaths week 10->Two weeks ago, compared with earlier time period pre-covid
+```{r}
+eval.sum['2019-2020'] - eval.sum['2018-2019']
+eval.sum.comp['2019-2020'] - eval.sum.comp['2018-2019']
+
+```
+
+
 ## Figure S2: Excess all-cause deaths for NY state (incl NYC) vs Excess deaths due to pneumonia and influenza
 
 ```{r fig.s2, fig.width=8, fig.height=6}
