@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-18'
+  end.data.date: '2020-04-25'
 ---
 
 ```{r, include = F}
@@ -340,12 +340,12 @@ nchs.base.comb$week_end <- as.Date(nchs.base.comb$week_end, '%m/%d/%Y')
 #Import the cdcfluview data
 pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
 
-pi.data <- pi.data[pi.data$coverage_area=='state',c('week_end','percent_pni', "total_pni","all_deaths" ,'region_name')]
-names(pi.data) <-c('week_end',"percent_pni",'pni_fv','all_deaths_fv','region_name')
+pi.data <- pi.data[pi.data$coverage_area=='state',c('week_end','percent_pni' ,'region_name')]
+names(pi.data) <-c('week_end',"percent_pni",'region_name')
 
 pi.data <- merge(nchs.base.comb, pi.data, by.x=c('state','week_end'), by.y=c('region_name','week_end'), all=T)
 
-#
+#estimated P&I deaths from %P&I and N all deaths
 pi.data$pi.fv <-
   round(pi.data$all_cause*pi.data$percent_pni)
 
@@ -415,7 +415,7 @@ pi.data.exclude <-
   pi.data.exclude[!(pi.data.exclude$state %in% exclude.states),]
 
 natl.pi.data <- 
-  aggregate(pi.data.exclude[,c("pi.fv", 'all_deaths_fv')],
+  aggregate(pi.data.exclude[,c("pi.fv", 'all_cause')],
             by=list('week_end'=pi.data.exclude$week_end,
                 'year_week_num'=pi.data.exclude$week ), FUN=sum)
 
@@ -425,7 +425,7 @@ names(natl.pi.data) <- c('week_end','year_week_num','total_pni','all_deaths','st
 
 
 state.pi.data <-
-  pi.data[,c('week_end','week','pi.fv','all_deaths_fv','state')]
+  pi.data[,c('week_end','week','pi.fv','all_cause','state')]
 names(state.pi.data) <- c('week_end','year_week_num','total_pni','all_deaths','state')
 
 pi.data.combined <- 
@@ -836,10 +836,12 @@ names(res.pi2) <-
 res.ac2 <- res.ac
 res.ac2$denom <-NULL
 names(res.ac2) <-
-  c('state','week_end_date','year','week','day','week_start','baseline_all_cause','baseline_all_cause_lower', 'baseline_all_cause_upper', 'all_cause_deaths','excess_all_cause_deaths', 'nchs.covid.deaths')
+  c('state','week_end_date','year','week','day','week_start_date','baseline_all_cause','baseline_all_cause_lower', 'baseline_all_cause_upper', 'all_cause_deaths','excess_all_cause_deaths', 'nchs.covid.deaths')
+
+res.ac2 <- res.ac2[,c('state','week_end_date','week_start_date','baseline_all_cause','baseline_all_cause_lower', 'baseline_all_cause_upper', 'all_cause_deaths','excess_all_cause_deaths', 'nchs.covid.deaths')]
 
 comb1 <- merge(res.ac2, res.pi2,
-               by=c('state','week_end_date'), all=T)
+               by.x=c('state','week_end_date','week_start_date'),by.y=c('state','week_end_date','week_start'), all=T)
 
 nchs.covid1<-
   analysis.data2[,c('state','week_end','nchs.covid.deaths')]
@@ -876,22 +878,22 @@ comb2.trim$rr.pic <-
 comb2.trim$rr.ac <-
   comb2.trim$all_cause_deaths/comb2.trim$baseline_all_cause
 
-comb2.trim <- comb2.trim[!is.na(comb2.trim$week.x),]
+comb2.trim <- comb2.trim[!is.na(comb2.trim$week),]
 comb2.trim$epiweek <- NA
-comb2.trim$epiweek[comb2.trim$week.x<=26] <-
-  comb2.trim$week.x[comb2.trim$week.x<=26] +26
+comb2.trim$epiweek[comb2.trim$week<=26] <-
+  comb2.trim$week[comb2.trim$week<=26] +26
 
-comb2.trim$epiweek[comb2.trim$week.x>=27] <-
-  comb2.trim$week.x[comb2.trim$week.x>=27] -26
+comb2.trim$epiweek[comb2.trim$week>=27] <-
+  comb2.trim$week[comb2.trim$week>=27] -26
 
 comb2.trim$epiyr <- NA
-comb2.trim$epiyr <- comb2.trim$year.x
-comb2.trim$epiyr[comb2.trim$week.x<=26] <-
-  comb2.trim$year.x[comb2.trim$week.x<=26] -1
+comb2.trim$epiyr <- comb2.trim$year
+comb2.trim$epiyr[comb2.trim$week<=26] <-
+  comb2.trim$year[comb2.trim$week<=26] -1
 
 comb2.trim$week_end_date <-NULL
 comb2.trim$date <-NULL
-
+comb2.trim$week_start_date <-NULL
 comb2.m <- melt(comb2.trim, id.vars=c('state','epiweek','epiyr'))
 comb2.c <- acast(comb2.m, state~epiweek~epiyr~variable )
 
