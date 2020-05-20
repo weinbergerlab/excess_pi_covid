@@ -647,17 +647,6 @@ points(res.pi.nat$week_end, res.pi.nat$obs, type='l',  col='red', bty='l')
 
 ```
 
-```{r}
-##Simple analyses
-test1 <- analysis.data2[analysis.data2$state=='FL',]
-weeks <- mmwr_week(test1$week_end)
-test1 <- cbind.data.frame(test1, weeks)
-test1.m <- melt(test1[,c("nchs.total.deaths","mmwr_week", 'mmwr_year' )], id.vars=c('mmwr_week','mmwr_year'))
-test1.c <- dcast(test1.m, mmwr_week~mmwr_year)
-test1.c <- test1.c[test1.c$mmwr_week >=10 & test1.c$mmwr_week<=14,]
-col.sum.fl <- apply(test1.c,2, sum)
-
-```
 
 
 ## National analysis of all-cause 
@@ -990,7 +979,7 @@ title(xlab = "Date",
 ## Table 1: Excess P&I deaths and reported deaths due to COVID-19
 
 ```{r, table1}
-nchs.tot.deaths <- aggregate(comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,                           c('nchs.covid.deaths','covid.track.death')], by=list('state'=comb2$state[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
+nchs.tot.deaths <- aggregate(comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,                           c('nchs.covid.deaths','covid.track.death',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb2$state[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
 
 formatted.excess.ac <- 
   paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
@@ -1037,9 +1026,12 @@ order.states <- order.states
 excess.combined <- excess.combined[order.states,]
 
 excess.combined2 <-
-  excess.combined[,c('state','nchs.covid.deaths',"Excess P&I&C" ,"formatted.excess.ac" ,"Excess all-cause deaths/100,000")]
+  excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'nchs.covid.deaths', "Excess P&I&C", "Excess all-cause deaths/100,000")]
 
-names(excess.combined2) <- c('State','COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths', 'Excess all-cause deaths', 'Excess all-cause deaths/100,000')
+names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess all-cause deaths', 'COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths',  'Excess all-cause deaths/100,000')
+
+excess.combined2$`Expected deaths` <-
+  round(excess.combined2$`Expected deaths`, -2)
 
 htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
