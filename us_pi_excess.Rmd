@@ -695,8 +695,8 @@ pred.iter.ac2.nat.sum <- apply(pred.iter.ac2.nat,c(1,2),sum)
 
 pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,0.5,0.975)))
 
-res.ac.nat <- cbind.data.frame('week_end'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
-names(res.ac.nat) <- c('week_end','obs','lpi','pred','upi')
+res.ac.nat <- cbind.data.frame('week_start'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
+names(res.ac.nat) <- c('week_start','obs','lpi','pred','upi')
 
 sum.obs.ac2 <- apply(sum.obs.ac,2,sum)
 sum.ac.excess <- sapply(1:length(sum.obs.ac2),
@@ -724,11 +724,10 @@ sum.excess.deaths.range.ac.nat <-
 
 #res.ac.nat <- res.ac[res.ac$state=='US',]
 
-yrange.pneu <- range(c(res.ac.nat$pred, res.ac.nat$obs, res.ac.nat$upi,0))
 
 ```
 
-Total excess all cause deaths
+## JAMA IM Fig 1
 ```{r}
 #print(sum.excess.deaths.range.ac)
 
@@ -747,12 +746,53 @@ nat.range.ac
 `r if(!params$web.version){print(formatted.ac)}`
 
 
-```{r plot_ac_natl}
-plot(res.ac.nat$week_end, res.ac.nat$pred, type='l', ylim=yrange.pneu, col='gray', bty='l', ylab='All-cause Deaths', xlab='')
+```{r plot_ac_natl, fig.width=6, fig.height=4}
 
-polygon(c(res.ac.nat$week_end, rev(res.ac.nat$week_end)), c(res.ac.nat$lpi, rev(res.ac.nat$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
+covid.deaths.nat <- aggregate(test.ds3.spl[,'covid.track.death',drop=F], by=list('week_start'=test.ds3.spl$date), FUN=sum)
 
-points(res.ac.nat$week_end, res.ac.nat$obs, type='l', col='red', bty='l')
+covid.deaths.nat$week_end <- covid.deaths.nat$week_start +days(6)
+
+nat.range.ac2 <- merge(res.ac.nat, covid.deaths.nat, by='week_start' , all=T)
+nat.range.ac2$covid.track.death[is.na(nat.range.ac2$covid.track.death)] <-0
+
+nat.range.ac2$excess <- nat.range.ac2$obs - nat.range.ac2$pred
+
+nat.range.ac2$band1 <- nat.range.ac2$pred +
+  nat.range.ac2$covid.track.death
+
+#nat.range.ac2$band2 <- nat.range.ac2$pred +
+#  nat.range.ac2$excess_pic
+
+nat.range.ac2 <- nat.range.ac2[!is.na(nat.range.ac2$pred),]
+
+nat.range.ac2 <- nat.range.ac2[nat.range.ac2$week_start>= as.Date('2020-03-01'),]
+
+yrange.pneu <- range(c(nat.range.ac2$pred, nat.range.ac2$obs))
+
+plot(nat.range.ac2$week_start, nat.range.ac2$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
+
+points(nat.range.ac2$week_start, nat.range.ac2$obs, type='l', col='black', bty='l')
+
+polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$pred, rev(nat.range.ac2$band1)),col =rgb(141/255,160/255,203/255, alpha = 0.9), border = NA )
+
+# polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$band1, rev(nat.range.ac2$band2)),col = rgb(252/255,141/255,98/255, alpha = 0.9), border = NA )
+# 
+# polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$band2, rev(nat.range.ac2$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
+
+points(nat.range.ac2$week_start, nat.range.ac2$pred, type='l', ylim=yrange.pneu, col='black', lty=2, lwd=2)
+
+legend('topleft',inset=0.05, 
+       pch=c(15,15,15, NA, NA),
+       lty=c(NA, NA, NA, 1,2), 
+       lwd=c(NA, NA, NA, 1,2), 
+       legend=c(  'Unexplained Excess','Pneumonia & Influenza','Reported COVID-19', 'Observed Deaths', 'Expected Deaths'),
+       col=c( rgb(102/255,194/255,165/255,alpha = 0.9),
+              rgb(252/255,141/255,98/255, alpha = 0.9), 
+              rgb(141/255,160/255,203/255, alpha = 0.9), 'black', 'black'),
+       box.lty=0 ,
+       bg="transparent")
+
+
 ```
 
 ```{r summary_table_natl}
