@@ -8,11 +8,14 @@
 stack_plot_func <- function(ds, legend=T){
 ds$excess <- ds$obs - ds$pred
 
+ds$excess_pi_unexp <- ds$excess_pic - ds$covid.track.death
+ds$excess_pi_unexp[ds$excess_pi_unexp<0] <-0
+
 ds$band1 <- ds$pred +
   ds$covid.track.death
 
-#ds$band2 <- ds$pred +
-#  ds$excess_pic
+ds$band2 <- ds$band1 +
+  ds$excess_pi_unexp
 
 ds <- ds[!is.na(ds$pred),]
 
@@ -24,15 +27,15 @@ yrange.pneu <- range(c(ds$pred, ds$obs))
 
 plot(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
 
-points(ds$week_end, ds$obs, type='l', col='black', bty='l')
 
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1)),col =rgb(141/255,160/255,203/255, alpha = 0.9), border = NA )
 
-# polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band1, rev(ds$band2)),col = rgb(252/255,141/255,98/255, alpha = 0.9), border = NA )
-# 
-# polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band2, rev(ds$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
+ polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band1, rev(ds$band2)),col = rgb(252/255,141/255,98/255, alpha = 0.9), border = NA )
+ 
+ polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band2, rev(ds$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
 
 points(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='black', lty=2, lwd=2)
+points(ds$week_end, ds$obs, type='l', col='black', bty='l')
 
 if(legend==T){
 legend('bottomleft',inset=0.01, 
