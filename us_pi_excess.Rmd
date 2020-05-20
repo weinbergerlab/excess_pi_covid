@@ -278,6 +278,9 @@ nrevvs.combo <-
   rbind.data.frame(nrevvs.natl,clin4.lags)
 ```
 
+### Explanation of NCHS data sources
+NCHS mostly provides data based on location of death rather than location of residence. For states like Florida, where there is a large population of seasonal residents, this can make a big difference. NCHS also info on underlying cause for specific causes like pneumonia&influenza. The exception to this is the new P&I&Coronavirus data, which is based on multiple-cause of death statistics CDC fluview provides data on all-cause and P&I based on location of residence, and provides information on multiple-cause (e.g., P&I listed anywhere on death certificate.) To get a baseline for all-cause deaths, we use the NCHS all-cause data, and combine this with the covidView all-cause data. For excess P&I&C, we use combine the all-cause data from NCHS from the baseline period with the *proportion* of deaths that are due to P&I. The assumption is that this proportion is the same for deaths based on residence and location of death. We then back-calculate the number of deaths that were P&I from this number and combine with the updated covidView data.
+
 ```{r}
 #Reporting delays from NobBS
 delays <- readRDS('./outputs/NobBs.complete.iters.rds')
@@ -304,20 +307,58 @@ names(delays.med.m) <- c('weeks.since.death','state','prop.complete')
 #Import the P&I data from fluview--this is used to set the historical baseline; updated weekly
 
 #ARCHIVE
+#Use static version of 2014-2018 data
+#url.nchs.base1 <- "https://data.cdc.gov/resource/pp7x-dyj2.json"
+nchs.base1.data <-
+  read.csv('./Data/nchs_base1_data/Weekly_Counts_of_Deaths_by_State_and_Select_Causes__2014-2018.csv')
+
+nchs.base1.data <-
+  nchs.base1.data[,c("Jurisdiction.of.Occurrence","MMWR.Year" ,"MMWR.Week" , "Week.Ending.Date","All..Cause","flag_allcause")]
+
+names(nchs.base1.data) <-c('state', 'year','week','week_end','all_cause', 'flag_ac')
+
+#API is truncating data--download static dataset
+#url.nchs.base2 <- "https://data.cdc.gov/resource/muzy-jte6.json"
+#ARCHIVE
+#nchs.base2.data <- runIfExpired('nchs_base2_data', 
+# ~jsonlite::read_json(url.nchs.base2, simplifyVector = T))
+nchs.base2.data <-
+  read.csv('./Data/nchs_base2_data/Weekly_Counts_of_Deaths_by_State_and_Select_Causes__2019-2020.csv')
+
+nchs.base2.data <- nchs.base2.data[, c("Jurisdiction.of.Occurrence","MMWR.Year", "MMWR.Week","Week.Ending.Date", 'All.Cause' ,"flag_allcause" )]
+
+nchs.base2.data$All.Cause <-
+  as.numeric(nchs.base2.data$All.Cause)
+
+names(nchs.base2.data) <-c('state', 'year','week','week_end','all_cause', 'flag_ac')
+
+nchs.base.comb <-
+  bind_rows(nchs.base1.data,nchs.base2.data)
+
+nchs.base.comb$week_end <- as.Date(nchs.base.comb$week_end, '%m/%d/%Y')
+
+#Import the cdcfluview data
 pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
 
-pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) & pi.data$geo_description=='State',]
+pi.data <- pi.data[pi.data$coverage_area=='state',c('week_end','percent_pni', "total_pni","all_deaths" ,'region_name')]
+names(pi.data) <-c('week_end',"percent_pni",'pni_fv','all_deaths_fv','region_name')
+
+pi.data <- merge(nchs.base.comb, pi.data, by.x=c('state','week_end'), by.y=c('region_name','week_end'), all=T)
+
+#
+pi.data$pi.fv <-
+  round(pi.data$all_cause*pi.data$percent_pni)
+
+pi.data <- pi.data[pi.data$week_end <= end.data.date,]
+
+pi.data.last <- pi.data[pi.data$week_end==max(pi.data$week_end) ,]
 
 last.date.avail.pi <- 
   max(pi.data$week_end)
-last.date.obtained <- 
-  last.date.avail.pi +6 #release date fr latest data (if            weekly)
 
- pi.data <- pi.data[pi.data$week_end <=                     (last.date.obtained-params$n.days.filter),]
- 
 pi.data <- pi.data[!(is.na(pi.data$week_end)),]
 
-pi.data.not.miss.states <- unique(pi.data.last$region_name)
+pi.data.not.miss.states <- unique(pi.data.last$state)
 
 pi.data.not.miss.states <- state.abb2[match(pi.data.not.miss.states, state.name2)]
 
@@ -368,24 +409,30 @@ cdc.summary.wk <- cdc.summary.wk[, c('state', 'end_week' ,'nchs.covid.deaths','n
 pi.data.exclude <- pi.data
 
 pi.data.exclude$state <-   
-  state.abb2[match(pi.data.exclude$region_name, state.name2)]
+  state.abb2[match(pi.data.exclude$state, state.name2)]
 
 pi.data.exclude <- 
   pi.data.exclude[!(pi.data.exclude$state %in% exclude.states),]
 
 natl.pi.data <- 
-  aggregate(pi.data.exclude[,c("total_pni", 'all_deaths')],
+  aggregate(pi.data.exclude[,c("pi.fv", 'all_deaths_fv')],
             by=list('week_end'=pi.data.exclude$week_end,
-                'year_week_num'=pi.data.exclude$weeknumber ), FUN=sum)
+                'year_week_num'=pi.data.exclude$week ), FUN=sum)
 
 natl.pi.data$state <- 'United States'
+
+names(natl.pi.data) <- c('week_end','year_week_num','total_pni','all_deaths','state')
+
+
 state.pi.data <-
-  pi.data[,c('week_end','year_week_num','total_pni','all_deaths','region_name')]
+  pi.data[,c('week_end','week','pi.fv','all_deaths_fv','state')]
 names(state.pi.data) <- c('week_end','year_week_num','total_pni','all_deaths','state')
 
 pi.data.combined <- 
   rbind.data.frame(state.pi.data, natl.pi.data)
 
+pi.data.combined <-
+  pi.data.combined[pi.data.combined$week_end >=as.Date('2015-01-05'),]
 
 ```
 
@@ -560,7 +607,7 @@ Efforts to track the severity and public health impact of the novel coronavirus,
 We evaluated increases in the occurrence of deaths due to any cause above a seasonal baseline  (adjusted for influenza activity) or deaths due to coronaivirus/P&I (P&I&C) for March-early-April across the United States. These estimates are compared with reported deaths due to COVID-19 and with testing data.
 
 *Results*
-There were notable increases in the rate of death due to all-causes and due to P&I&C in March and early-April 2020. In a number of states, these deaths pre-dated increases in COVID-19 testing rates and were not counted in official records at the time as related to COVID-19. There was substantial variability between states in the discrepancy between reported rates of death due to COVID-19 and the estimated burden of excess deaths due to P&I. The increase in all-cause deaths is 1.5 times higher than the official tally of COVID-19 reported deaths during the study period. 
+There were notable increases in the rate of death due to all-causes and due to P&I&C in March and early-April 2020. In a number of states, these deaths pre-dated increases in COVID-19 testing rates and were not counted in official records at the time as related to COVID-19. There was substantial variability between states in the discrepancy between reported rates of death due to COVID-19 and the estimated burden of excess deaths due to P&I. The increase in all-cause deaths is approximately 50% higher than the official tally of COVID-19 reported deaths during the study period. 
 
 *Conclusions*
 Excess deaths provide an estimate of full COVID-19 burden and indicate that official tallies likely undercount deaths due to the virus.
@@ -1041,6 +1088,7 @@ legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red')
 
 ```{r, table1}
 nchs.tot.deaths <- aggregate(comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,                           c('nchs.covid.deaths','covid.track.death',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb2$state[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
+
 formatted.excess.ac <- 
   paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
                       ' (' ,
@@ -1076,9 +1124,13 @@ order.states <- order.states
 excess.combined <- excess.combined[order.states,]
 excess.combined2 <-
   excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'nchs.covid.deaths', "Excess P&I&C", "Excess all-cause deaths/100,000")]
+
 names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess all-cause deaths', 'COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths',  'Excess all-cause deaths/100,000')
+
 excess.combined2$`Expected deaths` <-
   round(excess.combined2$`Expected deaths`, -2)
+
+
 htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
 
