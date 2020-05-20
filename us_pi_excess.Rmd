@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-25'
+  end.data.date: '2020-04-18'
 ---
 
 ```{r, include = F}
@@ -76,6 +76,7 @@ library(RCurl)
 set.seed(123)
 source('./functions/ts_plot_func.R')
 source('./functions/format_table.R')
+source('./functions/stack_plot.R')
 
 ```
 
@@ -283,9 +284,13 @@ delays <- readRDS('./outputs/NobBs.complete.iters.rds')
 dimnames(delays)[[3]][dimnames(delays)[[3]]=='US'] <- 'United States'
 dimnames(delays)[[3]] <-
   state.abb2[match(dimnames(delays)[[3]] , state.name2)]
+
+#states1.match <- unique()
 states2.match <- dimnames(delays)[[3]]
-commn.states <- Reduce(intersect, list(states1.match,states2.match))
-delays <- delays[,,commn.states]
+
+#commn.states <- Reduce(intersect, list(states1.match,states2.match))
+
+#delays <- delays[,,commn.states]
 delays <- delays[,1:10000,]
 delays.m <- melt(delays)
 names(delays.m) <- c('time.since.death','iter','state','prop')
@@ -468,6 +473,7 @@ analysis.data$vintage <- data.vintage
 
 analysis.data$n.weeks.ago <- round(as.numeric(difftime(analysis.data$vintage , analysis.data$week_end, units='weeks')))
 
+#Merge in reporting delay
 analysis.data <- merge(analysis.data,delays.med.m, by.x=c('state','n.weeks.ago'), by.y=c('state',"weeks.since.death"), all=T)
 
 analysis.data$prop.complete[is.na(analysis.data$prop.complete)] <- 1
@@ -620,7 +626,7 @@ sum.excess.deaths.range.pi <- sum.excess.deaths.range.pi[order(-sum.excess.death
 print(sum.excess.deaths.range.pi)
 ```
 
-```{r natl_pi_plot, eval= !params$web.version}
+```{r natl_pi_plot}
 
 yrange.pneu <- range(c(res.pi.nat$pred, res.pi.nat$obs, res.pi.nat$upi,0))
 
@@ -688,6 +694,7 @@ pred.iter.ac2 <- array(pred.iter.ac,dim=c(length(dates1),10000,dim(pred.iter.ac)
 
 dimnames(pred.iter.ac2)[[3]] <- dimnames(pred.iter.ac)[[2]]
 
+#Sum the state-level estimates to get national estimate
 pred.iter.ac2.nat <-
   pred.iter.ac2[,,dimnames(pred.iter.ac2)[[3]]!='US',1]
 
@@ -697,6 +704,9 @@ pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,
 
 res.ac.nat <- cbind.data.frame('week_start'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
 names(res.ac.nat) <- c('week_start','obs','lpi','pred','upi')
+res.ac.nat$week_end <- res.ac.nat$week_start+days(6)
+
+res.ac.nat <- merge(res.ac.nat,analysis.data2[analysis.data2$state=='US',c("nchs.covid.deaths", 'state', 'week_end')] , by=c('week_end'))
 
 sum.obs.ac2 <- apply(sum.obs.ac,2,sum)
 sum.ac.excess <- sapply(1:length(sum.obs.ac2),
@@ -711,8 +721,9 @@ sum.excess.deaths.range.ac <- cbind.data.frame('state'=unique(analysis.data2$sta
 
 res.ac <- format_excess_func(excess_ac_natl,'all_deaths')
 
-#national: sum state estimates
+res.ac <- merge(res.ac,analysis.data2[,c("nchs.covid.deaths", 'state', 'week_end')] , by=c('state', 'week_end'))
 
+#national: sum state estimates
 state.sum.pred.iter.ac <- sum.pred.iter.ac[,dimnames(sum.pred.iter.ac)[[2]]!='US',]
 
 nat.sum.pred.iter.ac <- apply(state.sum.pred.iter.ac,1,sum)
@@ -722,13 +733,11 @@ excess.nat.iter <-  sum.obs.ac.nat - nat.sum.pred.iter.ac
 sum.excess.deaths.range.ac.nat <-
   quantile(excess.nat.iter,  probs=c(0.025,0.1,0.3,0.5,0.975))
 
-#res.ac.nat <- res.ac[res.ac$state=='US',]
 
 
 ```
 
-## JAMA IM Fig 1
-```{r}
+```{r }
 #print(sum.excess.deaths.range.ac)
 
 nat.range.ac <-sum.excess.deaths.range.ac.nat
@@ -743,70 +752,45 @@ formatted.ac
 nat.range.ac
 
 ```
+
+
 `r if(!params$web.version){print(formatted.ac)}`
 
+## JAMA IM Fig 1
 
-```{r plot_ac_natl, fig.width=6, fig.height=4}
+```{r jama_fig1.plot_ac_natl, fig.width=6, fig.height=4}
 
 covid.deaths.nat <- aggregate(test.ds3.spl[,'covid.track.death',drop=F], by=list('week_start'=test.ds3.spl$date), FUN=sum)
 
 covid.deaths.nat$week_end <- covid.deaths.nat$week_start +days(6)
 
 nat.range.ac2 <- merge(res.ac.nat, covid.deaths.nat, by='week_start' , all=T)
+
+res.pi.trim <- res.pi.nat[,c('week_start','pred','obs')]
+res.pi.trim$excess_pic <- 
+  res.pi.trim$obs - res.pi.trim$pred
+res.pi.trim <- res.pi.trim[,c('week_start', 'excess_pic')]
+
+nat.range.ac2 <- merge(nat.range.ac2,res.pi.trim, by='week_start', all=T)
+
 nat.range.ac2$covid.track.death[is.na(nat.range.ac2$covid.track.death)] <-0
 
-nat.range.ac2$excess <- nat.range.ac2$obs - nat.range.ac2$pred
+nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 
-nat.range.ac2$band1 <- nat.range.ac2$pred +
-  nat.range.ac2$covid.track.death
-
-#nat.range.ac2$band2 <- nat.range.ac2$pred +
-#  nat.range.ac2$excess_pic
-
-nat.range.ac2 <- nat.range.ac2[!is.na(nat.range.ac2$pred),]
-
-nat.range.ac2 <- nat.range.ac2[nat.range.ac2$week_start>= as.Date('2020-03-01'),]
-
-yrange.pneu <- range(c(nat.range.ac2$pred, nat.range.ac2$obs))
-
-plot(nat.range.ac2$week_start, nat.range.ac2$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
-
-points(nat.range.ac2$week_start, nat.range.ac2$obs, type='l', col='black', bty='l')
-
-polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$pred, rev(nat.range.ac2$band1)),col =rgb(141/255,160/255,203/255, alpha = 0.9), border = NA )
-
-# polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$band1, rev(nat.range.ac2$band2)),col = rgb(252/255,141/255,98/255, alpha = 0.9), border = NA )
-# 
-# polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$band2, rev(nat.range.ac2$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
-
-points(nat.range.ac2$week_start, nat.range.ac2$pred, type='l', ylim=yrange.pneu, col='black', lty=2, lwd=2)
-
-legend('topleft',inset=0.05, 
-       pch=c(15,15,15, NA, NA),
-       lty=c(NA, NA, NA, 1,2), 
-       lwd=c(NA, NA, NA, 1,2), 
-       legend=c(  'Unexplained Excess','Pneumonia & Influenza','Reported COVID-19', 'Observed Deaths', 'Expected Deaths'),
-       col=c( rgb(102/255,194/255,165/255,alpha = 0.9),
-              rgb(252/255,141/255,98/255, alpha = 0.9), 
-              rgb(141/255,160/255,203/255, alpha = 0.9), 'black', 'black'),
-       box.lty=0 ,
-       bg="transparent")
-
+stack_plot_func(nat.range.ac2)
 
 ```
 
 ```{r summary_table_natl}
 res.pi2 <- res.pi
 names(res.pi2) <-
-  c('year','week','day','week_end_date','state','baseline_pi','baseline_pi_lower', 'baseline_pi_upper', 'pneumonia_influenza_covid','excess_pneumonia_influenza_covid','pic.denom')
+  c('year','week','day','week_start','state','baseline_pi','baseline_pi_lower', 'baseline_pi_upper', 'pneumonia_influenza_covid','excess_pneumonia_influenza_covid','pic.denom','week_end_date')
 
 res.ac2 <- res.ac
 res.ac2$denom <-NULL
 names(res.ac2) <-
-  c('year','week','day','week_end_date','state','baseline_all_cause','baseline_all_cause_lower', 'baseline_all_cause_upper', 'all_cause_deaths','excess_all_cause_deaths')
+  c('state','week_end_date','year','week','day','week_start','baseline_all_cause','baseline_all_cause_lower', 'baseline_all_cause_upper', 'all_cause_deaths','excess_all_cause_deaths', 'nchs.covid.deaths')
 
-res.ac2$week_end_date <- res.ac2$week_end_date + days(6)
-res.pi2$week_end_date <- res.pi2$week_end_date + days(6)
 comb1 <- merge(res.ac2, res.pi2,
                by=c('state','week_end_date'), all=T)
 
@@ -823,6 +807,12 @@ comb2 <- merge(comb2, test.ds3.spl,
                by=c('state','week_end_date'), all=T)
 
 comb2$covid.track.death[is.na(comb2$covid.track.death)] <- 0
+
+#Small cells suppressed by NCHS. in these instances, replace with Covidtrack numbers
+comb2$nchs.ct.deaths.comb <- comb2$nchs.covid.deaths
+
+# comb2$nchs.ct.deaths.comb[comb2$nchs.covid.deaths==0 &comb2$nchs.covid.deaths>0 ] <- 
+#   comb2$covid.track.death[comb2$nchs.covid.deaths==0 &comb2$nchs.covid.deaths>0 ]
 
 write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 ```
@@ -1034,6 +1024,18 @@ title(xlab = "Date",
    mtext(text="Tests/1000 people", line=2,side=4,outer=TRUE, cex=0.75, col='gray')
 
 ```
+
+#NCHS vs COVIDtracking.com data
+```{r}
+#Compare covid trakc death and NCHS deaths
+for(i in c('NY','LA')){
+st1 <- jh3[jh3$state==i,]
+plot(st1$week_end_date ,st1$covid.track.death, type='l', main=i)
+points (st1$week_end_date ,st1$nchs.covid.deaths,type='l', col='red')
+legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red'))
+}
+```
+
 
 ## Table 1: Excess P&I deaths and reported deaths due to COVID-19
 
