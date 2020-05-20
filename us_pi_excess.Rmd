@@ -277,6 +277,24 @@ nrevvs.combo <-
   rbind.data.frame(nrevvs.natl,clin4.lags)
 ```
 
+```{r}
+#Reporting delays from NobBS
+delays <- readRDS('./outputs/NobBs.complete.iters.rds')
+dimnames(delays)[[3]][dimnames(delays)[[3]]=='US'] <- 'United States'
+dimnames(delays)[[3]] <-
+  state.abb2[match(dimnames(delays)[[3]] , state.name2)]
+states2.match <- dimnames(delays)[[3]]
+commn.states <- Reduce(intersect, list(states1.match,states2.match))
+delays <- delays[,,commn.states]
+delays <- delays[,1:10000,]
+delays.m <- melt(delays)
+names(delays.m) <- c('time.since.death','iter','state','prop')
+delays.med <- apply(delays,c (1,3),median)
+delays.med.m <- melt(delays.med)
+delays.med.m$Var1 <- as.numeric(as.character(delays.med.m$Var1))
+names(delays.med.m) <- c('weeks.since.death','state','prop.complete')
+```
+
 ```{r import_state_pi_data}
 #Import the P&I data from fluview--this is used to set the historical baseline; updated weekly
 
@@ -444,6 +462,20 @@ states.cdc <- states.cdc[states.cdc!='US']
 
 date.print <- max(analysis.data$week_end, na.rm=T)
 
+
+#Merge in reporting delay info
+analysis.data$vintage <- data.vintage
+
+analysis.data$n.weeks.ago <- round(as.numeric(difftime(analysis.data$vintage , analysis.data$week_end, units='weeks')))
+
+analysis.data <- merge(analysis.data,delays.med.m, by.x=c('state','n.weeks.ago'), by.y=c('state',"weeks.since.death"), all=T)
+
+analysis.data$prop.complete[is.na(analysis.data$prop.complete)] <- 1
+
+analysis.data <- analysis.data[!is.na(analysis.data$all_deaths),]
+
+analysis.data$prop.complete.offset <-
+  analysis.data$prop.complete - 0.5
 ```
 
 
@@ -539,7 +571,7 @@ excess_ac_natl <-
   excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
-              adj.flu       = "flu_pct_adj_lag1",
+              adj.flu       = "none",
               denom.var     = "nchs.total.deaths",
               use.syndromes = c("nchs.pic"),
               extrapolation.date = extrap.date ,
@@ -600,18 +632,6 @@ points(res.pi.nat$week_end, res.pi.nat$obs, type='l',  col='red', bty='l')
 
 ```
 
-```{r}
-##Simple analyses
-test1 <- analysis.data2[analysis.data2$state=='FL',]
-weeks <- mmwr_week(test1$week_end)
-test1 <- cbind.data.frame(test1, weeks)
-test1.m <- melt(test1[,c("nchs.total.deaths","mmwr_week", 'mmwr_year' )], id.vars=c('mmwr_week','mmwr_year'))
-test1.c <- dcast(test1.m, mmwr_week~mmwr_year)
-test1.c <- test1.c[test1.c$mmwr_week >=10 & test1.c$mmwr_week<=14,]
-col.sum.fl <- apply(test1.c,2, sum)
-
-```
-
 
 ## National analysis of all-cause 
 
@@ -629,8 +649,8 @@ excess_ac_natl <-
   excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
-              adj.flu       = "flu_pct_adj_lag1",
-              denom.var     = 'one',
+              adj.flu       = "none",
+              denom.var     = "prop.complete.offset",
               use.syndromes = c("all_deaths"),
               extrapolation.date = extrap.date,
               sum.dates=count.start.date,
@@ -646,10 +666,37 @@ sum.obs.ac <-
                 syndrome = 'all_deaths',
                 extract.quantity = "sum.obs")
 
+##National data is created by summing state data
 sum.pred.iter.ac <-    
   excessExtract(ds = ds,
                 syndrome = 'all_deaths',
                 extract.quantity = "sum.pred.iter")
+
+ac.nat.obs <-    
+  excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "y")
+ac.nat.obs <- ac.nat.obs[,dimnames(ac.nat.obs)[[2]]!='US',1]
+ac.nat.obs <- apply(ac.nat.obs,1,sum)
+
+pred.iter.ac <-    
+  excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "pred.iter")
+
+pred.iter.ac2 <- array(pred.iter.ac,dim=c(length(dates1),10000,dim(pred.iter.ac)[2],1 ))
+
+dimnames(pred.iter.ac2)[[3]] <- dimnames(pred.iter.ac)[[2]]
+
+pred.iter.ac2.nat <-
+  pred.iter.ac2[,,dimnames(pred.iter.ac2)[[3]]!='US',1]
+
+pred.iter.ac2.nat.sum <- apply(pred.iter.ac2.nat,c(1,2),sum)
+
+pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,0.5,0.975)))
+
+res.ac.nat <- cbind.data.frame('week_end'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
+names(res.ac.nat) <- c('week_end','obs','lpi','pred','upi')
 
 sum.obs.ac2 <- apply(sum.obs.ac,2,sum)
 sum.ac.excess <- sapply(1:length(sum.obs.ac2),
@@ -664,11 +711,20 @@ sum.excess.deaths.range.ac <- cbind.data.frame('state'=unique(analysis.data2$sta
 
 res.ac <- format_excess_func(excess_ac_natl,'all_deaths')
 
-res.ac.nat <- res.ac[res.ac$state=='US',]
+#national: sum state estimates
+
+state.sum.pred.iter.ac <- sum.pred.iter.ac[,dimnames(sum.pred.iter.ac)[[2]]!='US',]
+
+nat.sum.pred.iter.ac <- apply(state.sum.pred.iter.ac,1,sum)
+sum.obs.ac.nat <- sum(sum.obs.ac2[names(sum.obs.ac2)!='US'])
+excess.nat.iter <-  sum.obs.ac.nat - nat.sum.pred.iter.ac
+
+sum.excess.deaths.range.ac.nat <-
+  quantile(excess.nat.iter,  probs=c(0.025,0.1,0.3,0.5,0.975))
+
+#res.ac.nat <- res.ac[res.ac$state=='US',]
 
 yrange.pneu <- range(c(res.ac.nat$pred, res.ac.nat$obs, res.ac.nat$upi,0))
-
-sum(res.ac.nat$unexplained.cases[res.ac.nat$mmwr_week>=10  & res.ac.nat$week_end>=as.Date('2020-01-01')])
 
 ```
 
@@ -676,7 +732,7 @@ Total excess all cause deaths
 ```{r}
 #print(sum.excess.deaths.range.ac)
 
-nat.range.ac <-sum.excess.deaths.range.ac[sum.excess.deaths.range.ac$state=='US',]
+nat.range.ac <-sum.excess.deaths.range.ac.nat
 
 formatted.ac <- 
   paste0(round(nat.range.ac['50%'],-2),
@@ -692,7 +748,6 @@ nat.range.ac
 
 
 ```{r plot_ac_natl}
-res.ac.nat <- res.ac[res.ac$state=='US',]
 plot(res.ac.nat$week_end, res.ac.nat$pred, type='l', ylim=yrange.pneu, col='gray', bty='l', ylab='All-cause Deaths', xlab='')
 
 polygon(c(res.ac.nat$week_end, rev(res.ac.nat$week_end)), c(res.ac.nat$lpi, rev(res.ac.nat$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
@@ -1481,17 +1536,6 @@ obs.unadj <-
 obs.unadj <- obs.unadj[,,1]
 states1.match <- dimnames(obs.unadj)[[2]]
 
-delays <- readRDS('./outputs/NobBs.complete.iters.rds')
-dimnames(delays)[[3]][dimnames(delays)[[3]]=='US'] <- 'United States'
-dimnames(delays)[[3]] <-
-  state.abb2[match(dimnames(delays)[[3]] , state.name2)]
-states2.match <- dimnames(delays)[[3]]
-commn.states <- Reduce(intersect, list(states1.match,states2.match))
-delays <- delays[,,commn.states]
-delays <- delays[,1:10000,]
-delays.m <- melt(delays)
-names(delays.m) <- c('time.since.death','iter','state','prop')
-delays.med <- apply(delays,c (1,3),median)
 
 obs.unadj <- as.data.frame(obs.unadj)
 obs.unadj$week_end <- ds[[1]]$`1`$US$date + days(6)
