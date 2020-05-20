@@ -280,6 +280,24 @@ nrevvs.combo <-
 ### Explanation of NCHS data sources
 NCHS mostly provides data based on location of death rather than location of residence. For states like Florida, where there is a large population of seasonal residents, this can make a big difference. NCHS also info on underlying cause for specific causes like pneumonia&influenza. The exception to this is the new P&I&Coronavirus data, which is based on multiple-cause of death statistics CDC fluview provides data on all-cause and P&I based on location of residence, and provides information on multiple-cause (e.g., P&I listed anywhere on death certificate.) To get a baseline for all-cause deaths, we use the NCHS all-cause data, and combine this with the covidView all-cause data. For excess P&I&C, we use combine the all-cause data from NCHS from the baseline period with the *proportion* of deaths that are due to P&I. The assumption is that this proportion is the same for deaths based on residence and location of death. We then back-calculate the number of deaths that were P&I from this number and combine with the updated covidView data.
 
+```{r}
+#Reporting delays from NobBS
+delays <- readRDS('./outputs/NobBs.complete.iters.rds')
+dimnames(delays)[[3]][dimnames(delays)[[3]]=='US'] <- 'United States'
+dimnames(delays)[[3]] <-
+  state.abb2[match(dimnames(delays)[[3]] , state.name2)]
+states2.match <- dimnames(delays)[[3]]
+commn.states <- Reduce(intersect, list(states1.match,states2.match))
+delays <- delays[,,commn.states]
+delays <- delays[,1:10000,]
+delays.m <- melt(delays)
+names(delays.m) <- c('time.since.death','iter','state','prop')
+delays.med <- apply(delays,c (1,3),median)
+delays.med.m <- melt(delays.med)
+delays.med.m$Var1 <- as.numeric(as.character(delays.med.m$Var1))
+names(delays.med.m) <- c('weeks.since.death','state','prop.complete')
+```
+
 ```{r import_state_pi_data}
 #Import the P&I data from fluview--this is used to set the historical baseline; updated weekly
 
@@ -491,6 +509,20 @@ states.cdc <- states.cdc[states.cdc!='US']
 
 date.print <- max(analysis.data$week_end, na.rm=T)
 
+
+#Merge in reporting delay info
+analysis.data$vintage <- data.vintage
+
+analysis.data$n.weeks.ago <- round(as.numeric(difftime(analysis.data$vintage , analysis.data$week_end, units='weeks')))
+
+analysis.data <- merge(analysis.data,delays.med.m, by.x=c('state','n.weeks.ago'), by.y=c('state',"weeks.since.death"), all=T)
+
+analysis.data$prop.complete[is.na(analysis.data$prop.complete)] <- 1
+
+analysis.data <- analysis.data[!is.na(analysis.data$all_deaths),]
+
+analysis.data$prop.complete.offset <-
+  analysis.data$prop.complete - 0.5
 ```
 
 
@@ -586,7 +618,7 @@ excess_ac_natl <-
   excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
-              adj.flu       = "flu_pct_adj_lag1",
+              adj.flu       = "none",
               denom.var     = "nchs.total.deaths",
               use.syndromes = c("nchs.pic"),
               extrapolation.date = extrap.date ,
@@ -648,7 +680,6 @@ points(res.pi.nat$week_end, res.pi.nat$obs, type='l',  col='red', bty='l')
 ```
 
 
-
 ## National analysis of all-cause 
 
 ```{r, include=F}
@@ -665,8 +696,8 @@ excess_ac_natl <-
   excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
-              adj.flu       = "flu_pct_adj_lag1",
-              denom.var     = 'one',
+              adj.flu       = "none",
+              denom.var     = "prop.complete.offset",
               use.syndromes = c("all_deaths"),
               extrapolation.date = extrap.date,
               sum.dates=count.start.date,
@@ -682,10 +713,37 @@ sum.obs.ac <-
                 syndrome = 'all_deaths',
                 extract.quantity = "sum.obs")
 
+##National data is created by summing state data
 sum.pred.iter.ac <-    
   excessExtract(ds = ds,
                 syndrome = 'all_deaths',
                 extract.quantity = "sum.pred.iter")
+
+ac.nat.obs <-    
+  excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "y")
+ac.nat.obs <- ac.nat.obs[,dimnames(ac.nat.obs)[[2]]!='US',1]
+ac.nat.obs <- apply(ac.nat.obs,1,sum)
+
+pred.iter.ac <-    
+  excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "pred.iter")
+
+pred.iter.ac2 <- array(pred.iter.ac,dim=c(length(dates1),10000,dim(pred.iter.ac)[2],1 ))
+
+dimnames(pred.iter.ac2)[[3]] <- dimnames(pred.iter.ac)[[2]]
+
+pred.iter.ac2.nat <-
+  pred.iter.ac2[,,dimnames(pred.iter.ac2)[[3]]!='US',1]
+
+pred.iter.ac2.nat.sum <- apply(pred.iter.ac2.nat,c(1,2),sum)
+
+pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,0.5,0.975)))
+
+res.ac.nat <- cbind.data.frame('week_start'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
+names(res.ac.nat) <- c('week_start','obs','lpi','pred','upi')
 
 sum.obs.ac2 <- apply(sum.obs.ac,2,sum)
 sum.ac.excess <- sapply(1:length(sum.obs.ac2),
@@ -700,19 +758,27 @@ sum.excess.deaths.range.ac <- cbind.data.frame('state'=unique(analysis.data2$sta
 
 res.ac <- format_excess_func(excess_ac_natl,'all_deaths')
 
-res.ac.nat <- res.ac[res.ac$state=='US',]
+#national: sum state estimates
 
-yrange.pneu <- range(c(res.ac.nat$pred, res.ac.nat$obs, res.ac.nat$upi,0))
+state.sum.pred.iter.ac <- sum.pred.iter.ac[,dimnames(sum.pred.iter.ac)[[2]]!='US',]
 
-sum(res.ac.nat$unexplained.cases[res.ac.nat$mmwr_week>=10  & res.ac.nat$week_end>=as.Date('2020-01-01')])
+nat.sum.pred.iter.ac <- apply(state.sum.pred.iter.ac,1,sum)
+sum.obs.ac.nat <- sum(sum.obs.ac2[names(sum.obs.ac2)!='US'])
+excess.nat.iter <-  sum.obs.ac.nat - nat.sum.pred.iter.ac
+
+sum.excess.deaths.range.ac.nat <-
+  quantile(excess.nat.iter,  probs=c(0.025,0.1,0.3,0.5,0.975))
+
+#res.ac.nat <- res.ac[res.ac$state=='US',]
+
 
 ```
 
-Total excess all cause deaths
+## JAMA IM Fig 1
 ```{r}
 #print(sum.excess.deaths.range.ac)
 
-nat.range.ac <-sum.excess.deaths.range.ac[sum.excess.deaths.range.ac$state=='US',]
+nat.range.ac <-sum.excess.deaths.range.ac.nat
 
 formatted.ac <- 
   paste0(round(nat.range.ac['50%'],-2),
@@ -727,13 +793,53 @@ nat.range.ac
 `r if(!params$web.version){print(formatted.ac)}`
 
 
-```{r plot_ac_natl}
-res.ac.nat <- res.ac[res.ac$state=='US',]
-plot(res.ac.nat$week_end, res.ac.nat$pred, type='l', ylim=yrange.pneu, col='gray', bty='l', ylab='All-cause Deaths', xlab='')
+```{r plot_ac_natl, fig.width=6, fig.height=4}
 
-polygon(c(res.ac.nat$week_end, rev(res.ac.nat$week_end)), c(res.ac.nat$lpi, rev(res.ac.nat$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
+covid.deaths.nat <- aggregate(test.ds3.spl[,'covid.track.death',drop=F], by=list('week_start'=test.ds3.spl$date), FUN=sum)
 
-points(res.ac.nat$week_end, res.ac.nat$obs, type='l', col='red', bty='l')
+covid.deaths.nat$week_end <- covid.deaths.nat$week_start +days(6)
+
+nat.range.ac2 <- merge(res.ac.nat, covid.deaths.nat, by='week_start' , all=T)
+nat.range.ac2$covid.track.death[is.na(nat.range.ac2$covid.track.death)] <-0
+
+nat.range.ac2$excess <- nat.range.ac2$obs - nat.range.ac2$pred
+
+nat.range.ac2$band1 <- nat.range.ac2$pred +
+  nat.range.ac2$covid.track.death
+
+#nat.range.ac2$band2 <- nat.range.ac2$pred +
+#  nat.range.ac2$excess_pic
+
+nat.range.ac2 <- nat.range.ac2[!is.na(nat.range.ac2$pred),]
+
+nat.range.ac2 <- nat.range.ac2[nat.range.ac2$week_start>= as.Date('2020-03-01'),]
+
+yrange.pneu <- range(c(nat.range.ac2$pred, nat.range.ac2$obs))
+
+plot(nat.range.ac2$week_start, nat.range.ac2$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
+
+points(nat.range.ac2$week_start, nat.range.ac2$obs, type='l', col='black', bty='l')
+
+polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$pred, rev(nat.range.ac2$band1)),col =rgb(141/255,160/255,203/255, alpha = 0.9), border = NA )
+
+# polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$band1, rev(nat.range.ac2$band2)),col = rgb(252/255,141/255,98/255, alpha = 0.9), border = NA )
+# 
+# polygon(c(nat.range.ac2$week_start, rev(nat.range.ac2$week_start)), c(nat.range.ac2$band2, rev(nat.range.ac2$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
+
+points(nat.range.ac2$week_start, nat.range.ac2$pred, type='l', ylim=yrange.pneu, col='black', lty=2, lwd=2)
+
+legend('topleft',inset=0.05, 
+       pch=c(15,15,15, NA, NA),
+       lty=c(NA, NA, NA, 1,2), 
+       lwd=c(NA, NA, NA, 1,2), 
+       legend=c(  'Unexplained Excess','Pneumonia & Influenza','Reported COVID-19', 'Observed Deaths', 'Expected Deaths'),
+       col=c( rgb(102/255,194/255,165/255,alpha = 0.9),
+              rgb(252/255,141/255,98/255, alpha = 0.9), 
+              rgb(141/255,160/255,203/255, alpha = 0.9), 'black', 'black'),
+       box.lty=0 ,
+       bg="transparent")
+
+
 ```
 
 ```{r summary_table_natl}
@@ -988,8 +1094,6 @@ formatted.excess.ac <-
                       round(sum.excess.deaths.range.ac[,'97.5%'],-2), ')'
                       )
 formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.excess.ac)
-
-
 formatted.excess.pic <- 
   paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
                       ' (' ,
@@ -997,11 +1101,8 @@ formatted.excess.pic <-
                       round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
                       )
 formatted.excess.pic <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state, 'Excess P&I&C'= formatted.excess.pic)
-
 sum.excess.deaths.range.ac.inc <- merge(sum.excess.deaths.range.ac, pop2, by='state', all=T)
-
 sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='US'] <- 328200000
-
 formatted.excess.ac.INC <- 
   paste0(round(sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1),
                       ' (' ,
@@ -1009,22 +1110,16 @@ formatted.excess.ac.INC <-
                       round(sum.excess.deaths.range.ac.inc[,'97.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ')'
                       )
 formatted.excess.ac.INC <- cbind.data.frame('state'=sum.excess.deaths.range.ac.inc$state, 'Excess all-cause deaths/100,000'= formatted.excess.ac.INC, "excess.inc.raw"=sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000)
-
 excess.combined <-
   merge(formatted.excess.pic,formatted.excess.ac.INC, by='state')
-
 excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
-
 excess.combined <- merge(nchs.tot.deaths, excess.combined,by='state')
-
 #excess.combined
-
 #sort by incidence
 excess.combined$excess.inc.raw[excess.combined$state=='US'] <- 99999999
 order.states <- rev(order(excess.combined$excess.inc.raw))
 order.states <- order.states 
 excess.combined <- excess.combined[order.states,]
-
 excess.combined2 <-
   excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'nchs.covid.deaths', "Excess P&I&C", "Excess all-cause deaths/100,000")]
 
@@ -1032,6 +1127,7 @@ names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess
 
 excess.combined2$`Expected deaths` <-
   round(excess.combined2$`Expected deaths`, -2)
+
 
 htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
@@ -1520,17 +1616,6 @@ obs.unadj <-
 obs.unadj <- obs.unadj[,,1]
 states1.match <- dimnames(obs.unadj)[[2]]
 
-delays <- readRDS('./outputs/NobBs.complete.iters.rds')
-dimnames(delays)[[3]][dimnames(delays)[[3]]=='US'] <- 'United States'
-dimnames(delays)[[3]] <-
-  state.abb2[match(dimnames(delays)[[3]] , state.name2)]
-states2.match <- dimnames(delays)[[3]]
-commn.states <- Reduce(intersect, list(states1.match,states2.match))
-delays <- delays[,,commn.states]
-delays <- delays[,1:10000,]
-delays.m <- melt(delays)
-names(delays.m) <- c('time.since.death','iter','state','prop')
-delays.med <- apply(delays,c (1,3),median)
 
 obs.unadj <- as.data.frame(obs.unadj)
 obs.unadj$week_end <- ds[[1]]$`1`$US$date + days(6)

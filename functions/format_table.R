@@ -41,10 +41,10 @@ format_excess_func <- function(excess.obj, syndrome1){
   
   res1.m <- melt(res1)
   res1.c <- dcast(res1.m,  Var1+Var2~Var3)
-  names(res1.c)[1:2] <-c('week_end','state')
-  res1.c$week_end <- as.Date(res1.c$week_end)
-  
-  mmwr.rs <- mmwr_week(res1.c$week_end)
+  names(res1.c)[1:2] <-c('week_start','state')
+  res1.c$week_start <- as.Date(res1.c$week_start)
+  res1.c$week_end <- as.date(res1.c$week_start) +days(6)
+  mmwr.rs <- mmwr_week(res1.c$week_start)
   res2<- cbind.data.frame(mmwr.rs, res1.c)
   
   return(res2)

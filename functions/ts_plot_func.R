@@ -9,8 +9,8 @@ for(i in plot.state.indices){
   }
   ds.select <- ds.plot[ds.plot$state==states.cdc[i],]
   max.test.this.state <- max(ds.select$test.week.per.capita, na.rm=T)
-  ave_pi <- mean(ds.select$pneumonia_influenza_covid, na.rm=T)
-  y.range1<-range(c(ds.select[,death.var], (ds.select$excess_pneumonia_influenza_covid)), na.rm=T)
+  ave_pi <- mean(ds.select$all_cause_deaths, na.rm=T)
+  y.range1<-range(c(ds.select[,death.var], (ds.select$excess_all_cause_deaths)), na.rm=T)
   
   #Makes all have same relative range
   #ave.range <- c(-ave_pi*0.2, ave_pi*ylim.adj)
@@ -18,7 +18,7 @@ for(i in plot.state.indices){
   ave.range <-y.range1 
   
   ds.select$death.early <- ds.select[,death.var]
-  ds.select$death.early[is.na(ds.select$excess_pi)] <- NA
+  ds.select$death.early[is.na(ds.select$excess_all_cause_deaths)] <- NA
   par(new=FALSE)
   plot(ds.select$week_end_date         ,
        ds.select[,death.var],
@@ -38,7 +38,7 @@ for(i in plot.state.indices){
          lty=1, lwd=1)
   
   points(ds.select$week_end_date        ,
-         ds.select$excess_pneumonia_influenza_covid, type='l', col='#e41a1c', lwd=1)
+         ds.select$excess_all_cause_deaths, type='l', col='#e41a1c', lwd=1)
   #state.name.plot <-  state.name[match(states.cdc[i],state.abb)]
   if(states[i] %in% state.abb ){
     state.name.plot <-    
@@ -46,8 +46,8 @@ for(i in plot.state.indices){
   }else{
     state.name.plot <- states.cdc[i]
   }
- upper <-  ds.select$pneumonia_influenza_covid- ds.select$baseline_pi_upper 
- lower <-  ds.select$pneumonia_influenza_covid- ds.select$baseline_pi_lower 
+ upper <-  ds.select$all_cause_deaths - ds.select$baseline_all_cause_upper  
+ lower <-  ds.select$all_cause_deaths - ds.select$baseline_all_cause_lower 
  pis <- cbind(upper, lower)
  cl.max <- apply(pis,1, max) 
  cl.max <-cl.max[!is.na(cl.max)]
