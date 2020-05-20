@@ -41,6 +41,7 @@ end.data.date <- as.Date(params$end.data.date)
 state.name2 <- c(state.name, 'District of Columbia','Puerto Rico', 'United States', 'New York City')
 state.abb2 <- c(state.abb, 'DC','PR','US','NYC')
 
+
 last.date.format <- 
   format(end.data.date, '%b %d, %Y')
 ```
@@ -117,6 +118,8 @@ runIfExpired <- function(storeName, f, maxage=hours(12)) {
 plot.states <- c('CA','TX','FL','NJ', 'NY','WA','IL','GA','MI','LA', 'MA' )
 
 exclude.states <- c('CT', 'NC', 'PR') #no up-to-date number
+
+jama.states <- c('NJ','FL','MA','MI')
 #exclude.states <- c('')
 ```
 
@@ -719,6 +722,11 @@ sum.obs.ac <-
                 syndrome = 'all_deaths',
                 extract.quantity = "sum.obs")
 
+denom.check <-
+    excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "denom")
+
 ##National data is created by summing state data
 sum.pred.iter.ac <-    
   excessExtract(ds = ds,
@@ -858,7 +866,7 @@ comb2 <- merge(comb2, test.ds3.spl,
 comb2$covid.track.death[is.na(comb2$covid.track.death)] <- 0
 
 #Small cells suppressed by NCHS. in these instances, replace with Covidtrack numbers
-comb2$nchs.ct.deaths.comb <- comb2$nchs.covid.deaths
+#comb2$nchs.ct.deaths.comb <- comb2$nchs.covid.deaths
 
 # comb2$nchs.ct.deaths.comb[comb2$nchs.covid.deaths==0 &comb2$nchs.covid.deaths>0 ] <- 
 #   comb2$covid.track.death[comb2$nchs.covid.deaths==0 &comb2$nchs.covid.deaths>0 ]
@@ -1061,16 +1069,18 @@ jh3<-jh3[jh3$week_end_date >=as.Date('2020-02-01'),]
 jh3 <- jh3[!is.na(jh3$week_end_date),]
 ```
 
-```{r fig3, fig.width=7.3, fig.height=6.9}
+```{r fig3, fig.width=6, fig.height=4}
 ## uses NCHS covid deaths for reported deaths
-
-  par(mfrow=c(5,4), mar=c(2,4,3,1), oma = c(3,3,0,3) + 0.1)
-ts.plot.func(ds.plot=jh3,   states.plot=unique(jh3$state),ylim.adj=15.0 ,death.var="nchs.covid.deaths" )
+jh3.trim <- jh3[jh3$week_end_date<=end.data.date,]
+  par(mfrow=c(2,2), mar=c(2,4,3,1), oma = c(3,3,0,3) + 0.1)
+ts.plot.func(ds.plot=jh3.trim,   states.plot=jama.states,ylim.adj=15.0 ,death.var="covid.track.death" ,plot.order=T)
 
 title(xlab = "Date",
       ylab = "N Deaths",
       outer = TRUE, line = 1, cex=1.0)
    mtext(text="Tests/1000 people", line=2,side=4,outer=TRUE, cex=0.75, col='gray')
+
+
 
 ```
 
@@ -1080,7 +1090,7 @@ title(xlab = "Date",
 for(i in c('NY','LA')){
 st1 <- jh3[jh3$state==i,]
 plot(st1$week_end_date ,st1$covid.track.death, type='l', main=i)
-points (st1$week_end_date ,st1$nchs.covid.deaths,type='l', col='red')
+points (st1$week_end_date ,st1$nchs.covid.deaths.y,type='l', col='red')
 legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red'))
 }
 ```
@@ -1088,8 +1098,16 @@ legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red')
 
 ## Table 1: Excess P&I deaths and reported deaths due to COVID-19
 
+TODO: SUB IN NATIONAL ESTIMATES FROM SUMMING STATES
+
 ```{r, table1}
-nchs.tot.deaths <- aggregate(comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,                           c('nchs.covid.deaths','covid.track.death',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb2$state[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
+comb3 <- comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,]
+
+#if cells are suppressed by NCHS, sub in the covidtracking data for that week and state
+comb3$corrected.nchs.covid <-comb3$nchs.covid.deaths.y
+comb3$corrected.nchs.covid[comb3$nchs.covid.deaths.y==0 & comb3$covid.track.death>0] <- comb3$covid.track.death [comb3$nchs.covid.deaths.y==0 & comb3$covid.track.death>0]
+
+nchs.tot.deaths <- aggregate(comb3[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date,                           c('nchs.covid.deaths.x','covid.track.death','corrected.nchs.covid',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb3$state[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
 
 formatted.excess.ac <- 
   paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
@@ -1125,7 +1143,7 @@ order.states <- rev(order(excess.combined$excess.inc.raw))
 order.states <- order.states 
 excess.combined <- excess.combined[order.states,]
 excess.combined2 <-
-  excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'nchs.covid.deaths', "Excess P&I&C", "Excess all-cause deaths/100,000")]
+  excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'corrected.nchs.covid', "Excess P&I&C", "Excess all-cause deaths/100,000")]
 
 names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess all-cause deaths', 'COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths',  'Excess all-cause deaths/100,000')
 
