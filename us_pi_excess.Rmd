@@ -194,7 +194,7 @@ nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c(
       'total_a','total_b',
       'total_specimens','state_region')
   
-  #clin2 <- clin2[, clin2.subsetvars]
+  clin2 <- clin2[, clin2.subsetvars]
   
   names(clin2)[1:2] <- c("state", "hhs_region")
   
