@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-25'
+  end.data.date: '2020-04-28'
 ---
 
 ```{r, include = F}
@@ -835,6 +835,13 @@ nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 stack_plot_func(nat.range.ac2)
 
 ```
+Observed deaths/baseline over time
+```{r}
+
+rat1 <- nat.range.ac2$obs/nat.range.ac2$pred
+plot(nat.range.ac2$week_end.x, rat1, type='l')
+```
+
 
 ```{r summary_table_natl}
 res.pi2 <- res.pi
@@ -1059,7 +1066,7 @@ The red line shows the number of excess P&I cases +/-95% prediction intervals. T
 
 jh3 <- comb2
 #Only plot out to 1 week ahead of the US P&I data
-jh3 <- jh3[ jh3$week_end_date <= end.data.date +weeks(1),]
+jh3 <- jh3[ jh3$week_end_date <= end.data.date +weeks(0),]
 jh3 <- jh3[jh3$state %in% states.cdc,]
 #jh3 <-jh3[!is.na(jh3$excess_pi ),]
 
