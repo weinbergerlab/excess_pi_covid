@@ -660,7 +660,7 @@ excess_pi_natl <-
               use.syndromes = c("nchs.pic"),
               extrapolation.date = extrap.date ,
               sum.dates = count.start.date,
-              model.type='negbin',
+              model.type='poisson',
               time.res='week')
 ds <- excess_pi_natl
 
@@ -805,7 +805,7 @@ excess_ac_natl <-
               use.syndromes = c("all_deaths"),
               extrapolation.date = extrap.date,
               sum.dates=count.start.date,
-              model.type='negbin',
+              model.type='poisson',
               time.res='week')
 ds <- excess_ac_natl
 
@@ -1548,7 +1548,7 @@ excess_deaths1.adjusted <-
               use.syndromes = c("nchs.pic"),
               extrapolation.date = extrap.date ,
               sum.dates = count.start.date,
-              model.type='negbin',
+              model.type='poisson',
               time.res='week')
 ```
  
@@ -1608,7 +1608,7 @@ htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to p
 ```{r, include=F} 
 #Run analysis 
 set.seed(123)
-excess_deaths1.adjusted <-
+excess_deaths1.flu.adjusted <-
   excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
@@ -1617,26 +1617,26 @@ excess_deaths1.adjusted <-
               use.syndromes = c("nchs.total.deaths"),
               extrapolation.date = extrap.date ,
               sum.dates = count.start.date,
-              model.type='negbin',
+              model.type='poisson',
               time.res='week')
 ```
  
 ```{r}
 #Extract the data needed to plot from the results
-ds <- excess_deaths1.adjusted
+ds <- excess_deaths1.flu.adjusted
 
 sum.pred.iter.adj <-    
-  excessExtract(ds = ds,
+  excessExtract(ds = excess_deaths1.flu.adjusted,
                 syndrome = 'nchs.total.deaths',
                 extract.quantity = "sum.pred.iter")
 
 sum.obs.adj <-
-    excessExtract(ds = ds,
+    excessExtract(ds = excess_deaths1.flu.adjusted,
                 syndrome = 'nchs.total.deaths',
                 extract.quantity = "sum.obs")
 
 denom1 <-
-    excessExtract(ds = ds,
+    excessExtract(ds = excess_deaths1.flu.adjusted,
                 syndrome = 'nchs.total.deaths',
                 extract.quantity = "denom")
 
@@ -1664,13 +1664,13 @@ formatted.ac.adj <-
 formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac.adj$state,formatted.ac.adj)
 
 formatted.ac.adj <- 
-  paste0(round(sum.excess.deaths.range.ac[,'50%'],-1),
+  paste0(round(sum.excess.deaths.range.ac.adj[,'50%'],-1),
                       ' (' ,
-                      round(sum.excess.deaths.range.ac[,'2.5%'],-1), ',' ,
-                      round(sum.excess.deaths.range.ac[,'97.5%'],-1), ')'
+                      round(sum.excess.deaths.range.ac.adj[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.ac.adj[,'97.5%'],-1), ')'
                       )
 
-formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.ac.adj)
+formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac.adj$state,formatted.ac.adj)
 
 formatted.ac.unadj <- formatted.excess.ac
 
@@ -1735,7 +1735,7 @@ matplot(fd.c[1:17,-1], type='l', col=col.plot, bty='l')
 #Further analyses of national all-cause data
 ##This shows 1) deseasonalizing fluvar doesn't make a difference in national analysis (2) using a cyclic spline rather than harmonics to adjust seasonality doesn't make a difference (3) Models with flu fit better than models without during the training period (AIC)
 
-nat1 <- analysis.data2[analysis.data2$state=='US',]
+nat1 <- analysis.data2[analysis.data2$state=='FL',]
 nat1$log.flu.lag1 <- as.numeric(scale(log(nat1$flu_pct_adj_lag1)))
 nat1$time <- 1:nrow(nat1)
 nat1$sin52 <- sin(2*pi*nat1$time/52.1775)
@@ -1782,11 +1782,22 @@ nat1$log.flu.deseasonalize <- nat1$log.flu.lag1-pred.flu
 mod4 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +log.flu.deseasonalize, data=nat1)
 pred4 <- predict(mod4, type='response', newdata=nat1)
 
+#add offset
+nat1$log.offset <- log(nat1$prop.complete.offset+0.5)
+mod5 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +log.flu.deseasonalize +offset(log.offset), data=nat1)
+pred5 <- predict(mod5, type='response', newdata=nat1)
+
+nat1$log.offset <- log(nat1$prop.complete.offset+0.5)
+mod6 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +offset(log.offset), data=nat1)
+pred6 <- predict(mod6, type='response', newdata=nat1)
+
 
 plot(nat1$week_end, pred1, type='l', col='red', ylim=c(0, max(nat1$nchs.total.deaths)*1.2))
 points(nat1$week_end, pred2, type='l', col='blue')
 points(nat1$week_end, pred3, type='l', col='black')
-points(nat1$week_end, pred4, type='l', col='purple')
+#points(nat1$week_end, pred4, type='l', col='purple')
+points(nat1$week_end, pred5, type='l', col='orange')
+points(nat1$week_end, pred6, type='l', col='purple')
 
 
 plot(pred1, col='gray', type='l', ylim=c(0,max(pred1)))
