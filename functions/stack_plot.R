@@ -1,7 +1,7 @@
 #Ds should have the following columns: 
 # 'obs', 
 # 'pred', 
-# 'nchs.covid.deaths', 
+# 'covid.death.hybrid', 
 # 'week_start'
 # 'excess_pic'
 
@@ -9,13 +9,13 @@ stack_plot_func <- function(ds, legend=T){
 ds <- ds[!is.na(ds$obs),]
 ds$excess <- ds$obs - ds$pred
 
-ds$excess_pi_unexp <- ds$excess_pic - ds$nchs.covid.deaths
+ds$excess_pi_unexp <- ds$excess_pic - ds$covid.death.hybrid
 ds$excess_pi_unexp[ds$excess_pi_unexp<0] <-0
 
-ds$band1 <- ds$pred +  ds$nchs.covid.deaths
+ds$band1 <- ds$pred +  ds$covid.death.hybrid
 #ds$band1[ds$band1>= ds$obs] <- ds$obs[ds$band1>= ds$obs]
 
-ds$band1.full <- ds$pred +  ds$nchs.covid.deaths
+ds$band1.full <- ds$pred +  ds$covid.death.hybrid
 
 ds$band2 <- ds$band1 +
   ds$excess_pi_unexp
@@ -45,12 +45,15 @@ polygon(c(ds$week_end, rev(ds$week_end)), c(ds$obs, rev(rep(max(yrange.pneu),len
 #add back on the reported covids that are> than observed
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1.full)),col =rgb(141/255,160/255,203/255, alpha = 0.1), border = NA )
 
+#bottom part of plot shaded
+#polygon(c(ds$week_end, rev(ds$week_end)), c(rep(0, nrow(ds)), rev(ds$pred)),col ='lightgray', border = NA )
+
 
 points(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='black', lty=2, lwd=2)
 points(ds$week_end, ds$obs, type='l', col='black', bty='l')
 
 if(legend==T){
-legend('topleft',inset=0.01, 
+legend('bottomleft',inset=0.01, 
        pch=c(15,15,15, NA, NA),
        lty=c(NA, NA, NA, 1,2), 
        lwd=c(NA, NA, NA, 1,2), 
