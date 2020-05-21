@@ -701,11 +701,11 @@ sum.pred.iter.pic <-
                 syndrome = 'nchs.pic',
                 extract.quantity = "sum.pred.iter")
 
-pic.nat.obs <-    
+pic.nat.obs.state <-    
   excessExtract(ds = excess_pi_natl,
                 syndrome = 'nchs.pic',
                 extract.quantity = "y")
-pic.nat.obs <- pic.nat.obs[,dimnames(pic.nat.obs)[[2]]!='US',1]
+pic.nat.obs <- pic.nat.obs.state[,dimnames(pic.nat.obs.state)[[2]]!='US',1]
 pic.nat.obs <- apply(pic.nat.obs,1,sum)
 
 pred.iter.pic <-    
@@ -746,7 +746,10 @@ res.pi.nat <- bind_rows(res.pi.nat, res.pi)
 state.sum.pred.iter.pi <- sum.pred.iter.pic[,dimnames(sum.pred.iter.pic)[[2]]!='US',]
 
 nat.sum.pred.iter.pi <- apply(state.sum.pred.iter.pi,1,sum)
-sum.obs.pi.nat <- sum(sum.obs[names(sum.obs)!='US'])
+obs.state2 <- cbind.data.frame(dates1,pic.nat.obs.state[,,1])
+obs.state2 <- obs.state2[obs.state2$dates1 >=params$count.start.date,]
+sum.obs.pi.nat <-
+  sum(obs.state2[,-1] )
 excess.nat.iter <-  sum.obs.pi.nat - nat.sum.pred.iter.pi
 
 sum.excess.deaths.range.pi.nat <-
@@ -1261,6 +1264,9 @@ formatted.excess.ac <-
                       round(sum.excess.deaths.range.ac[,'97.5%'],-2), ')'
                       )
 formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.excess.ac)
+
+sum.excess.deaths.range.pi <-
+  as.data.frame(sum.excess.deaths.range.pi)
 formatted.excess.pic <- 
   paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
                       ' (' ,
@@ -1290,7 +1296,7 @@ excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
 excess.combined <- merge(nchs.tot.deaths, excess.combined,by='state')
 #excess.combined
 #sort by incidence
-excess.combined$excess.inc.raw[excess.combined$state=='US'] <- 99999999
+excess.combined$excess.inc.raw[excess.combined$state=='US.agg'] <- 99999999
 order.states <- rev(order(excess.combined$excess.inc.raw))
 order.states <- order.states 
 excess.combined <- excess.combined[order.states,]
