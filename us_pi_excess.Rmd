@@ -1698,12 +1698,13 @@ formatted.ac.adj <-
 
 formatted.ac.adj <- cbind.data.frame('state'=sum.excess.deaths.range.ac.adj$state,formatted.ac.adj)
 
+#unadjusted model from above
 formatted.ac.unadj <- formatted.excess.ac
 
 summary.table.adj.adj <- merge(formatted.ac.unadj,formatted.ac.adj, by='state')
 
 names(summary.table.adj.adj) <- c('State', 'Excess deaths, unadjusted for influenza','Excess deaths, adjusted for influenza' )
-htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to any cause, as estimated from a regression that adjusts for influenza with a regression that does not, with or without adjustments for reporting delays')
+htmlTable(summary.table.adj.adj, caption='Comparison of excess deaths due to any cause, as estimated from a regression that adjusts for influenza with a regression that does not, with or without adjustments for reporting delays')
 
 ```
 
