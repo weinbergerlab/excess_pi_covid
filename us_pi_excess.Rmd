@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-05-02'
+  end.data.date: '2020-04-25'
 ---
 
 ```{r, include = F}
@@ -962,6 +962,8 @@ plot(nat.rat$week_end[nat.rat$week_end>=params$count.start.date], ratio_excss_co
 }
 ```
 
+## JAMA IM Fig 2
+
 ```{r jama_im_figs2.3, fig.width=8, fig.height=3.25}
 
 nat.range.ac2 <- res.ac
@@ -986,6 +988,8 @@ stack_plot_func(nat.range.ac2.spl[['NYC']], legend=F, scale.plot=6.8)
 title("New York City")
 
 ```
+
+## JAMA IM Fig 3
 
 ```{r jama.im.fig3, fig.width=8, fig.height=6.5}
 fig.scaling=3
@@ -1030,7 +1034,7 @@ comb2 <- merge(comb2, test.ds3.spl,
                by=c('state','week_end_date'), all=T)
 
 
-
+comb2 <- comb2[comb2$state!='US',] #this is unadjusted
 
 write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 ```
@@ -1216,7 +1220,7 @@ for(i in plot.state.indices){
 ```
 
 
-## Figure 3: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
+## JAMA-IM fig 4: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
 The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by covidtracking.com), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. 
 
 ```{r}
