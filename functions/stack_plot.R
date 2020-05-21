@@ -5,7 +5,7 @@
 # 'week_start'
 # 'excess_pic'
 
-stack_plot_func <- function(ds, legend=T){
+stack_plot_func <- function(ds, legend=T, scale.plot=1,legend.loc='topleft'){
 ds <- ds[!is.na(ds$obs),]
 ds$excess <- ds$obs - ds$pred
 
@@ -26,9 +26,9 @@ ds <- ds[!is.na(ds$pred),]
 ds <- ds[ds$week_start>= as.Date('2020-03-01'),]
 
 ds$week_end <- ds$week_start + days(6)
-
-yrange.pneu <- range(c(ds$pred, ds$obs, ds$band2),0)
-
+initial.base <- ds$pred[1]
+#yrange.pneu <- range(c(ds$pred, ds$obs, ds$band2),0)
+yrange.pneu <- c(0, initial.base*scale.plot)
 plot(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
 
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1)),col =rgb(141/255,160/255,203/255, alpha = 1), border = NA )
@@ -39,20 +39,20 @@ polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band1, rev(ds$band2)),col = rgb(2
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band2, rev(ds$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
 
 #mask any polygons above observed
-#polygon(c(ds$week_end, rev(ds$week_end)), c(ds$obs, rev(rep(max(yrange.pneu),length(ds$obs) ))),col = 'white', border = NA )
+polygon(c(ds$week_end, rev(ds$week_end)), c(ds$obs, rev(rep(max(yrange.pneu),length(ds$obs) ))),col = 'white', border = NA )
 
 #add back on the reported covids that are> than observed
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1.full)),col =rgb(141/255,160/255,203/255, alpha = 0.1), border = NA )
 
 #bottom part of plot shaded
-#polygon(c(ds$week_end, rev(ds$week_end)), c(rep(0, nrow(ds)), rev(ds$pred)),col ='lightgray', border = NA )
+polygon(c(ds$week_end, rev(ds$week_end)), c(rep(0, nrow(ds)), rev(ds$pred)),col =rgb(0,0,0,alpha=0.05), border = NA )
 
 
 points(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='black', lty=2, lwd=2)
 points(ds$week_end, ds$obs, type='l', col='black', bty='l')
 
 if(legend==T){
-legend('bottomleft',inset=0.01, 
+legend(legend.loc,inset=0.025, 
        pch=c(15,15,15, NA, NA),
        lty=c(NA, NA, NA, 1,2), 
        lwd=c(NA, NA, NA, 1,2), 
