@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-25'
+  end.data.date: '2020-05-02'
 ---
 
 ```{r, include = F}
@@ -851,6 +851,7 @@ pred.iter.ac2.nat <-
 
 pred.iter.ac2.nat.sum <- apply(pred.iter.ac2.nat,c(1,2),sum)
 
+
 pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,0.5,0.975)))
 
 res.ac.nat <- cbind.data.frame('week_start'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
@@ -929,8 +930,6 @@ nat.range.ac
 
 ```{r jama_fig1.plot_ac_natl, fig.width=6, fig.height=5}
 
-
-
 nat.range.ac2 <- res.ac.nat
 
 res.pi.trim <- res.pi.nat[res.pi.nat$state=='US.agg',c('week_start','pred','obs')]
@@ -944,7 +943,7 @@ nat.range.ac2$covid.death.hybrid[is.na(nat.range.ac2$covid.death.hybrid)] <-0
 
 nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 
-stack_plot_func(nat.range.ac2)
+stack_plot_func(nat.range.ac2, scale.plot=1.3)
 
 ```
 
@@ -980,26 +979,27 @@ nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 
 nat.range.ac2.spl <- split(nat.range.ac2, nat.range.ac2$state)
 par(mfrow=c(1,2), mar=c(2,4,1,1))
-stack_plot_func(nat.range.ac2.spl[['NY']])
+stack_plot_func(nat.range.ac2.spl[['NY']], scale.plot=6.8)
 title("New York (exclude NYC)")
 
-stack_plot_func(nat.range.ac2.spl[['NYC']], legend=F)
+stack_plot_func(nat.range.ac2.spl[['NYC']], legend=F, scale.plot=6.8)
 title("New York City")
 
 ```
 
 ```{r jama.im.fig3, fig.width=8, fig.height=6.5}
-par(mfrow=c(2,2), mar=c(2,4,1,1))
-stack_plot_func(nat.range.ac2.spl[['NJ']], legend=F)
+fig.scaling=3
+par(mfrow=c(2,2), mar=c(2,4,2,1))
+stack_plot_func(nat.range.ac2.spl[['NJ']], legend=F,scale.plot=fig.scaling)
 title("New Jersey")
 
-stack_plot_func(nat.range.ac2.spl[['IL']], legend=F)
+stack_plot_func(nat.range.ac2.spl[['IL']], legend=F,scale.plot=fig.scaling)
 title("Illinois")
 
-stack_plot_func(nat.range.ac2.spl[['MI']], legend=T)
+stack_plot_func(nat.range.ac2.spl[['MI']], legend=T,scale.plot=fig.scaling)
 title("Michigan")
 
-stack_plot_func(nat.range.ac2.spl[['MA']], legend=F)
+stack_plot_func(nat.range.ac2.spl[['MA']], legend=F,scale.plot=fig.scaling)
 title("Massachusetts")
 
 ```
