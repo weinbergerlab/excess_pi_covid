@@ -126,6 +126,7 @@ jama.states <- c('NJ','FL','MA','MI')
 ```{r state_region_cw}
 #cross walk file to map  states to hhs regions
 #
+data(cdcfluview::hhs_regions)
 hhs_states <- cdcfluview::hhs_regions
 hhs_states$state <-
   state.abb2[match(hhs_states$state_or_territory, state.name2)]
