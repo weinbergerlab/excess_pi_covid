@@ -1255,6 +1255,7 @@ legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red')
 
 ```{r, table1}
 comb3 <- comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,]
+comb3 <- comb3[comb3$state !='US',]
 
 nchs.tot.deaths <- aggregate(comb3[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date,                           c("covid.death.hybrid",'covid.track.death',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb3$state[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
 
