@@ -545,6 +545,8 @@ analysis.data <- analysis.data[!is.na(analysis.data$all_deaths),]
 
 analysis.data$prop.complete.offset <-
   analysis.data$prop.complete - 0.5
+
+analysis.data <- analysis.data[analysis.data$state!='US',]
 ```
 
 
@@ -1283,6 +1285,7 @@ formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state
 
 sum.excess.deaths.range.pi <-
   as.data.frame(sum.excess.deaths.range.pi)
+
 formatted.excess.pic <- 
   paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
                       ' (' ,
