@@ -202,7 +202,7 @@ nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c(
   clin2$total_a <- as.numeric(clin2$total_a)
   clin2$total_b <- as.numeric(clin2$total_b)
   
-  clin2 <- aggregate(clin2[, c('total_specimens','total_a','total_b')], by=list('state'=clin2$state, 'wk_date'=clin2$wk_date,'hhs_region'=clin2$hhs_region), FUN=sum, na.rm=T)
+  #clin2 <- aggregate(clin2[, c('total_specimens','total_a','total_b')], by=list('state'=clin2$state, 'wk_date'=clin2$wk_date,'hhs_region'=clin2$hhs_region), FUN=sum, na.rm=T)
   
   ##Florida doesn't have ILI data, so use regions ILI dat
   #
@@ -229,14 +229,14 @@ nrevvs.state <- runIfExpired('nrevss_state', ~cdcfluview::who_nrevss(region = c(
                  by = c("hhs_region", "wk_date"))
 
   #If no specimens for state, use HHS region estimates
-  clin3$total_specimens[clin3$total_specimens==0] <-
-    clin3$hhs_total_specimens[clin3$total_specimens==0]
+  clin3$total_specimens[is.na(clin3$total_specimens)] <-
+    clin3$hhs_total_specimens[is.na(clin3$total_specimens==0)]
   
-  clin3$total_a[clin3$total_a==0] <-
-    clin3$hhs_total_a[clin3$total_a==0]
+  clin3$total_a[is.na(clin3$total_a)] <-
+    clin3$hhs_total_a[is.na(clin3$total_a)]
   
-  clin3$total_b[clin3$total_b==0] <-
-    clin3$hhs_total_b[clin3$total_b==0]
+  clin3$total_b[is.na(clin3$total_b)] <-
+    clin3$hhs_total_b[is.na(clin3$total_b)]
   
   clin3$total_specimens <- as.numeric(clin3$total_specimens)
   
@@ -264,6 +264,7 @@ nrevvs.natl <- nrevvs.natl$clinical_labs
 nrevvs.natl <-
   nrevvs.natl[,c('wk_date','percent_positive') ]
 names(nrevvs.natl) <- c('wk_date','flu_pct_adj')
+nrevvs.natl$flu_pct_adj <- nrevvs.natl$flu_pct_adj/100
 
 natl.lag1 <- nrevvs.natl
 natl.lag1$wk_date <- natl.lag1$wk_date +days(7)
@@ -275,8 +276,7 @@ names(natl.lag2) <- c('wk_date','flu_pct_adj_lag2')
 
 nrevvs.natl <- merge(nrevvs.natl, natl.lag1, by='wk_date')
 nrevvs.natl <- merge(nrevvs.natl, natl.lag2, by='wk_date')
-
-nrevvs.natl$state <- 'US'
+nrevvs.natl$state <- 'United States'
 
 nrevvs.combo <-
   rbind.data.frame(nrevvs.natl,clin4.lags)
@@ -1609,14 +1609,14 @@ htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to p
 #Run analysis 
 set.seed(123)
 excess_deaths1.flu.adjusted <-
-  excessCases(ds = analysis.data2,
+excessCases(ds = analysis.data2,
               datevar       = "week_end",
               statevar      = "state",
-              adj.flu       = "flu_pct_adj_lag1",
+              adj.flu       = "flu_pct_adj_lag1" ,
               denom.var     = "prop.complete.offset",
-              use.syndromes = c("nchs.total.deaths"),
-              extrapolation.date = extrap.date ,
-              sum.dates = count.start.date,
+              use.syndromes = c("all_deaths"),
+              extrapolation.date = extrap.date,
+              sum.dates=count.start.date,
               model.type='poisson',
               time.res='week')
 ```
@@ -1627,18 +1627,24 @@ ds <- excess_deaths1.flu.adjusted
 
 sum.pred.iter.adj <-    
   excessExtract(ds = excess_deaths1.flu.adjusted,
-                syndrome = 'nchs.total.deaths',
+                syndrome = 'all_deaths',
                 extract.quantity = "sum.pred.iter")
+
+date.check <- excess_deaths1.flu.adjusted[[1]]$`1`$FL$date
 
 sum.obs.adj <-
     excessExtract(ds = excess_deaths1.flu.adjusted,
-                syndrome = 'nchs.total.deaths',
+                syndrome = 'all_deaths',
                 extract.quantity = "sum.obs")
 
 denom1 <-
     excessExtract(ds = excess_deaths1.flu.adjusted,
-                syndrome = 'nchs.total.deaths',
+                syndrome = 'all_deaths',
                 extract.quantity = "denom")
+y.check <-
+    excessExtract(ds = excess_deaths1.flu.adjusted,
+                syndrome = 'all_deaths',
+                extract.quantity = "y")
 
 sum.obs.state.adj <- apply(sum.obs.adj,2,sum)
 
@@ -1736,18 +1742,25 @@ matplot(fd.c[1:17,-1], type='l', col=col.plot, bty='l')
 ##This shows 1) deseasonalizing fluvar doesn't make a difference in national analysis (2) using a cyclic spline rather than harmonics to adjust seasonality doesn't make a difference (3) Models with flu fit better than models without during the training period (AIC)
 
 nat1 <- analysis.data2[analysis.data2$state=='FL',]
+nat1 <- nat1[order(nat1$week_end),]
+
 nat1$log.flu.lag1 <- as.numeric(scale(log(nat1$flu_pct_adj_lag1)))
 nat1$time <- 1:nrow(nat1)
 nat1$sin52 <- sin(2*pi*nat1$time/52.1775)
 nat1$sin26 <- sin(2*pi*nat1$time*2/52.1775)
+nat1$sin13 <- sin(2*pi*nat1$time*3/52.1775)
+
 nat1$cos52 <- cos(2*pi*nat1$time/52.1775)
 nat1$cos26 <- cos(2*pi*nat1$time*2/52.1775)
-nat1$fit.ac <- nat1$nchs.total.deaths
+nat1$cos13 <- cos(2*pi*nat1$time*3/52.1775)
+
+nat1$fit.ac <- nat1$all_deaths
 nat1$fit.ac[nat1$week_end>=as.Date('2020-02-01')] <-NA 
 nat1$year <- year(nat1$wk_date)
 nat1$week <- lubridate::week(nat1$wk_date)
 nat1$epiyr <- nat1$year
 nat1$epiyr[nat1$week<=26] <- nat1$year[nat1$week<=26]-1
+nat1$epiyr <- as.factor(nat1$epiyr)
 
 nat1$epiweek <- NA
 nat1$epiweek[nat1$week<=26] <-
@@ -1762,11 +1775,11 @@ nat1.cf$log.flu.lag1 <-
 
 
 library(MASS)
-mod1 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 + epiyr +log.flu.lag1, data=nat1)
+mod1 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +sin13+cos13+ epiyr +log.flu.lag1, data=nat1)
 pred1 <- predict(mod1, type='response', newdata=nat1)
 pred1.cf <-predict(mod1, type='response', newdata=nat1.cf)
 
-mod2 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr, data=nat1)
+mod2 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26+sin13+cos13+ epiyr, data=nat1)
 pred2 <- predict(mod2, type='response', newdata=nat1)
 
 library(mgcv)
@@ -1775,22 +1788,30 @@ mod3 <- gam(fit.ac~ s(epiweek, bs='cc') +epiyr + log.flu.lag1, data=nat1, family
 pred3 <- predict(mod3, type='response', newdata=nat1)
 
 #Try to de-seasonalize flu first
-mod.flu <- glm(log.flu.lag1 ~ sin52 +cos52 +sin26 +cos26 +epiyr, data=nat1)
+mod.flu <- glm(log.flu.lag1 ~ sin52 +cos52 +sin26 +cos26 +sin13+cos13+epiyr, data=nat1)
 pred.flu <- predict(mod.flu)
 nat1$log.flu.deseasonalize <- nat1$log.flu.lag1-pred.flu
 
-mod4 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +log.flu.deseasonalize, data=nat1)
+mod4 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26+sin13+cos13+ epiyr +log.flu.deseasonalize, data=nat1)
 pred4 <- predict(mod4, type='response', newdata=nat1)
+excess4 <- cbind.data.frame('excess'=(nat1$all_deaths - pred4), 'date'=nat1$week_end)
+excess4.sum <- sum(excess4$excess[excess4$date>=params$count.start.date])
 
-#add offset
+#add offset, non-deseasonalized flu
 nat1$log.offset <- log(nat1$prop.complete.offset+0.5)
-mod5 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +log.flu.deseasonalize +offset(log.offset), data=nat1)
+mod5 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +sin13+cos13+epiyr +log.flu.lag1 +offset(log.offset), data=nat1)
 pred5 <- predict(mod5, type='response', newdata=nat1)
+excess5 <- cbind.data.frame('excess'=(nat1$all_deaths - pred5), 'date'=nat1$week_end)
+excess5.sum <- sum(excess5$excess[excess5$date>=params$count.start.date])
 
+#only adjust for seasonality and year
 nat1$log.offset <- log(nat1$prop.complete.offset+0.5)
-mod6 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26 +epiyr +offset(log.offset), data=nat1)
+mod6 <- glm(fit.ac~ sin52 +cos52 +sin26 +cos26 +sin13+cos13+epiyr +offset(log.offset), data=nat1, family='poisson')
 pred6 <- predict(mod6, type='response', newdata=nat1)
+excess6 <- cbind.data.frame('excess'=(nat1$all_deaths - pred6), 'date'=nat1$week_end)
+excess6.sum <- sum(excess6$excess[excess6$date>=params$count.start.date])
 
+ds1<-cbind.data.frame(obs1=y.check[,'FL',1],nat1$all_deaths)
 
 plot(nat1$week_end, pred1, type='l', col='red', ylim=c(0, max(nat1$nchs.total.deaths)*1.2))
 points(nat1$week_end, pred2, type='l', col='blue')
