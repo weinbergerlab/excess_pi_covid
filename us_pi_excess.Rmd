@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-04-28'
+  end.data.date: '2020-04-25'
 ---
 
 ```{r, include = F}
@@ -947,11 +947,20 @@ nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 stack_plot_func(nat.range.ac2)
 
 ```
-Observed deaths/baseline over time
-```{r}
 
-rat1 <- nat.range.ac2$obs/nat.range.ac2$pred
-plot(nat.range.ac2$week_end, rat1, type='l')
+```{r, eval=F}
+#Excess/Covid over time
+
+statetest <- c('NYC',"MA",'IL','US.agg')
+par(mfrow=c(2,2), mar=c(2,4,1,1))
+for(i in statetest){
+nat.rat <- nat.range.ac2[nat.range.ac2$state==i,]
+excess1 <- nat.rat$obs-nat.rat$pred
+excess1[excess1<0] <-0
+ratio_excss_covid <- excess1 / nat.rat$covid.death.hybrid
+
+plot(nat.rat$week_end[nat.rat$week_end>=params$count.start.date], ratio_excss_covid[nat.rat$week_end>=params$count.start.date], type='l', main=i, ylab='', xlab='', ylim=c(1,5))
+}
 ```
 
 ```{r jama_im_figs2.3, fig.width=8, fig.height=3.25}
@@ -1286,6 +1295,7 @@ sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac
 
 sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='NY'] <- 19450000- 8399900
 
+
 formatted.excess.ac.INC <- 
   paste0(round(sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1),
                       ' (' ,
@@ -1293,8 +1303,10 @@ formatted.excess.ac.INC <-
                       round(sum.excess.deaths.range.ac.inc[,'97.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ')'
                       )
 formatted.excess.ac.INC <- cbind.data.frame('state'=sum.excess.deaths.range.ac.inc$state, 'Excess all-cause deaths/100,000'= formatted.excess.ac.INC, "excess.inc.raw"=sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000)
+
 excess.combined <-
   merge(formatted.excess.pic,formatted.excess.ac.INC, by='state')
+
 excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
 excess.combined <- merge(nchs.tot.deaths, excess.combined,by='state')
 #excess.combined
@@ -1303,6 +1315,11 @@ excess.combined$excess.inc.raw[excess.combined$state=='US.agg'] <- 99999999
 order.states <- rev(order(excess.combined$excess.inc.raw))
 order.states <- order.states 
 excess.combined <- excess.combined[order.states,]
+
+percent_coded_covid <-
+ round( excess.combined$covid.death.hybrid/(excess.combined$all_cause_deaths-excess.combined$baseline_all_cause)*100)
+percent_coded_covid <- cbind.data.frame(percent_coded_covid, excess.combined$state)
+
 excess.combined2 <-
   excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'covid.death.hybrid', "Excess P&I&C", "Excess all-cause deaths/100,000")]
 
@@ -1310,7 +1327,6 @@ names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess
 
 excess.combined2$`Expected deaths` <-
   round(excess.combined2$`Expected deaths`, -2)
-
 
 htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
