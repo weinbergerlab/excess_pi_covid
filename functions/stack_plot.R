@@ -17,8 +17,7 @@ ds$band1 <- ds$pred +  ds$covid.death.hybrid
 
 ds$band1.full <- ds$pred +  ds$covid.death.hybrid
 
-ds$band2 <- ds$band1 +
-  ds$excess_pi_unexp
+ds$band2 <- ds$band1 +  ds$excess_pi_unexp
 
 ds$band2[ds$band2> ds$obs] <- ds$obs[ds$band2> ds$obs]
 
@@ -28,19 +27,19 @@ ds <- ds[ds$week_start>= as.Date('2020-03-01'),]
 
 ds$week_end <- ds$week_start + days(6)
 
-yrange.pneu <- range(c(ds$pred, ds$obs),0)
+yrange.pneu <- range(c(ds$pred, ds$obs, ds$band2),0)
 
 plot(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
 
+polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1)),col =rgb(141/255,160/255,203/255, alpha = 1), border = NA )
 
-polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band1, rev(ds$band2)),col = rgb(252/255,141/255,98/255, alpha = 0.9), border = NA )
+polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band1, rev(ds$band2)),col = rgb(252/255,141/255,98/255, alpha = 1), border = NA )
 
-polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1)),col =rgb(141/255,160/255,203/255, alpha = 0.9), border = NA )
 
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$band2, rev(ds$obs)),col = rgb(102/255,194/255,165/255, alpha = 0.9), border = NA )
 
 #mask any polygons above observed
-polygon(c(ds$week_end, rev(ds$week_end)), c(ds$obs, rev(rep(max(yrange.pneu),length(ds$obs) ))),col = 'white', border = NA )
+#polygon(c(ds$week_end, rev(ds$week_end)), c(ds$obs, rev(rep(max(yrange.pneu),length(ds$obs) ))),col = 'white', border = NA )
 
 #add back on the reported covids that are> than observed
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1.full)),col =rgb(141/255,160/255,203/255, alpha = 0.1), border = NA )

@@ -770,16 +770,17 @@ print(sum.excess.deaths.range.pi)
 
 ```{r natl_pi_plot}
 
+natplot <- res.pi.nat[res.pi.nat$state=='US.agg',]
 yrange.pneu <- range(c(res.pi.nat$pred, res.pi.nat$obs, res.pi.nat$upi,0))
 
-plot(res.pi.nat$week_end, res.pi.nat$pred, type='l', ylim=yrange.pneu, col='gray',bty='l', ylab='Deaths due to P&I&C', xlab='' )
+plot(natplot$week_end, natplot$pred, type='l', ylim=yrange.pneu, col='gray',bty='l', ylab='Deaths due to P&I&C', xlab='' )
 
-polygon(c(res.pi.nat$week_end, rev(res.pi.nat$week_end)), c(res.pi.nat$lpi, rev(res.pi.nat$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
+polygon(c(natplot$week_end, rev(natplot$week_end)), c(natplot$lpi, rev(natplot$upi)),col = rgb(0, 0, 0, alpha = 0.1), border = NA )
 
-points(res.pi.nat$week_end, res.pi.nat$obs, type='l',  col='red', bty='l')
+points(natplot$week_end, natplot$obs, type='l',  col='red', bty='l')
 
 
-plot( res.pi.nat$obs/ res.pi.nat$pred, type='l')
+plot( natplot$obs/ natplot$pred, type='l')
 abline(h=1)
 ```
 
@@ -856,7 +857,7 @@ res.ac.nat <- cbind.data.frame('week_start'=dates1,'all_cause'=ac.nat.obs,pred.i
 names(res.ac.nat) <- c('week_start','obs','lpi','pred','upi')
 res.ac.nat$week_end <- res.ac.nat$week_start+days(6)
 
-covid.deaths.nat <- aggregate(cd1[,"covid.death.hybrid",drop=F], by=list('week_end'=cd1$week_end), FUN=sum)
+covid.deaths.nat <- aggregate(cd1[cd1$state!='US',"covid.death.hybrid",drop=F], by=list('week_end'=cd1$week_end[cd1$state!='US']), FUN=sum)
 
 covid.deaths.nat$week_start <- covid.deaths.nat$week_end -days(6)
 
@@ -866,6 +867,7 @@ res.ac.nat$unexplained.cases <- res.ac.nat$obs - res.ac.nat$pred
 res.ac.nat$state <- 'US.agg'
 mmwr.ag1 <- mmwr_week(res.ac.nat$week_end)
 res.ac.nat <- cbind.data.frame(mmwr.ag1,res.ac.nat)
+res.ac.nat <- res.ac.nat[!is.na(res.ac.nat$pred),]
 
 sum.obs.ac2 <- apply(sum.obs.ac,2,sum)
 sum.ac.excess <- sapply(1:length(sum.obs.ac2),
@@ -883,6 +885,7 @@ res.ac <- format_excess_func(excess_ac_natl,'all_deaths')
 res.ac <- merge(res.ac,cd1[,c("covid.death.hybrid", 'state', 'week_end')] , by=c('state', 'week_end'))
 
 res.ac <- bind_rows(res.ac.nat,res.ac)
+res.ac <- res.ac[!is.na(res.ac$pred),]
 
 
 
@@ -924,13 +927,13 @@ nat.range.ac
 
 ## JAMA IM Fig 1
 
-```{r jama_fig1.plot_ac_natl, fig.width=6, fig.height=4}
+```{r jama_fig1.plot_ac_natl, fig.width=6, fig.height=5}
 
 
 
 nat.range.ac2 <- res.ac.nat
 
-res.pi.trim <- res.pi.nat[,c('week_start','pred','obs')]
+res.pi.trim <- res.pi.nat[res.pi.nat$state=='US.agg',c('week_start','pred','obs')]
 res.pi.trim$excess_pic <- 
   res.pi.trim$obs - res.pi.trim$pred
 res.pi.trim <- res.pi.trim[,c('week_start', 'excess_pic')]
@@ -1810,6 +1813,7 @@ mod6 <- glm(fit.ac~ sin52 +cos52 +sin26 +cos26 +sin13+cos13+epiyr +offset(log.of
 pred6 <- predict(mod6, type='response', newdata=nat1)
 excess6 <- cbind.data.frame('excess'=(nat1$all_deaths - pred6), 'date'=nat1$week_end)
 excess6.sum <- sum(excess6$excess[excess6$date>=params$count.start.date])
+
 
 ds1<-cbind.data.frame(obs1=y.check[,'FL',1],nat1$all_deaths)
 
