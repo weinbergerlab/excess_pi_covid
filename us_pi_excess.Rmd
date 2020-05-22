@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-05-02'
+  end.data.date: '2020-05-09'
 ---
 
 ```{r, include = F}
@@ -1567,8 +1567,9 @@ provis.data.c1 <-
 
 write.csv(provis.data.c1, './outputs/provisional_deaths_reported_in_wkX.csv')
 
+provis.data.c2 <- provis.data.c1[,c("variable" , "epiwk",     "Week",'2018-2019','2019-2020')]
 provis.data.c <-
-  provis.data.c1[complete.cases(provis.data.c1),]
+  provis.data.c2[complete.cases(provis.data.c2),]
 
 all.deaths.provis <-
   provis.data.c[provis.data.c$variable=='All.Deaths',]
