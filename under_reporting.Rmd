@@ -76,10 +76,16 @@ wk19$max.date.report <- as.Date('2020-05-09')
 wk19$report.date <- as.Date('2020-05-15')
 
 
+wk20 <- 
+  read.csv('./archives_do_not_sync/State_Custom_Data20.csv')
+wk20$max.date.report <- as.Date('2020-05-16')
+wk20$report.date <- as.Date('2020-05-22')
+
+
 #Read in national data
 
 
-provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19'),
+provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20'),
                       function(x){
   d1 <- read.csv(paste0('./Data/provisional_pi/provisional', '2019-2020','_','week_',x,'.csv'))
   names(d1) <- toupper(names(d1))
@@ -94,7 +100,7 @@ provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','
     })
 nat.reports <- do.call('rbind.data.frame',provis.list)
 
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19)
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20)
 
 
 all.reports$epiyr <-
@@ -332,7 +338,7 @@ return(out.list)
 }
 ```
 
-```{r, eval=F}
+```{r, eval=T}
 #states.test <-'US'
 #mod1 <-jags.func('US')
 
@@ -459,7 +465,7 @@ dates1 <- as.Date(dimnames(check1.c)[[2]])
 check2 <- check1.c[,dates1 >=as.Date('2020-01-01'),]
 dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
 
-plot.states <- c('Oregon', 'Louisiana', 'New York', 'Florida')
+plot.states <- c('Delaware', 'Louisiana', 'New York', 'Florida')
 par(mfrow=c(2,2))
 for(i in plot.states){
   check3 <- check2[i,,]
