@@ -288,6 +288,33 @@ ny.nrevvs <- nrevvs.combo[nrevvs.combo$state=='NY',]
 ny.nrevvs$state <-'NYC'
 
 nrevvs.combo <- rbind.data.frame(nrevvs.combo,ny.nrevvs)
+
+nrevvs.combo.spl <- 
+  split(nrevvs.combo, nrevvs.combo$state)
+
+nrevvs.combo.spl <- lapply(nrevvs.combo.spl, function(x){
+month1 <- month(x$wk_date)
+cont.correct <- min(x$flu_pct_adj_lag1[x$flu_pct_adj_lag1>0], na.rm=T)/2
+x$log.flu.lag1 <- as.numeric(scale(log(x$flu_pct_adj_lag1+cont.correct )))
+log.flu.lag1.serf <- x$log.flu.lag1
+log.flu.lag1.serf[month1 %in% c(12,1,2) ] <- NA
+log.flu.lag1.serf[x$wk_date >=as.Date('2020-03-01') ] <- NA
+time <- 1:nrow(x)
+sin52 <- sin(2*pi*time/52.1775)
+sin26 <- sin(2*pi*time*2/52.1775)
+
+cos52 <- cos(2*pi*time/52.1775)
+cos26 <- cos(2*pi*time*2/52.1775)
+
+mod.flu <- lm(log.flu.lag1.serf ~ sin52 +cos52 +sin26 +cos26 )
+pred.flu <- predict(mod.flu, newdata=x)
+x$log.flu.deseasonalize <- x$log.flu.lag1-pred.flu
+x$log.flu.deseasonalize.0 <- x$log.flu.deseasonalize
+x$log.flu.deseasonalize.0[x$log.flu.deseasonalize.0<0] <-0
+return(x)
+})
+
+nrevvs.combo <- do.call('rbind.data.frame', nrevvs.combo.spl)
 ```
 
 ### Explanation of NCHS data sources
@@ -660,6 +687,7 @@ excess_pi_natl <-
               adj.flu       = "none",
               denom.var     = "nchs.total.deaths",
               use.syndromes = c("nchs.pic"),
+              covs= c('log.flu.deseasonalize.0'),
               extrapolation.date = extrap.date ,
               sum.dates = count.start.date,
               model.type='poisson',
@@ -806,6 +834,8 @@ excess_ac_natl <-
               adj.flu       = "none" ,
               denom.var     = "prop.complete.offset",
               use.syndromes = c("all_deaths"),
+                            covs= c('log.flu.deseasonalize.0'),
+
               extrapolation.date = extrap.date,
               sum.dates=count.start.date,
               model.type='poisson',
@@ -1819,6 +1849,8 @@ pred3 <- predict(mod3, type='response', newdata=nat1)
 mod.flu <- glm(log.flu.lag1 ~ sin52 +cos52 +sin26 +cos26 +sin13+cos13+epiyr, data=nat1)
 pred.flu <- predict(mod.flu)
 nat1$log.flu.deseasonalize <- nat1$log.flu.lag1-pred.flu
+nat1$log.flu.deseasonalize.0 <- nat1$log.flu.deseasonalize
+nat1$log.flu.deseasonalize.0[nat1$log.flu.deseasonalize.0<0] <-0
 
 mod4 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26+sin13+cos13+ epiyr +log.flu.deseasonalize, data=nat1)
 pred4 <- predict(mod4, type='response', newdata=nat1)
@@ -1839,6 +1871,11 @@ pred6 <- predict(mod6, type='response', newdata=nat1)
 excess6 <- cbind.data.frame('excess'=(nat1$all_deaths - pred6), 'date'=nat1$week_end)
 excess6.sum <- sum(excess6$excess[excess6$date>=params$count.start.date])
 
+#same as mod 4 but restrict flu aberrations to be >0
+mod7 <- glm.nb(fit.ac~ sin52 +cos52 +sin26 +cos26+sin13+cos13+ epiyr +log.flu.deseasonalize.0, data=nat1)
+pred7 <- predict(mod7, type='response', newdata=nat1)
+excess7 <- cbind.data.frame('excess'=(nat1$all_deaths - pred7), 'date'=nat1$week_end)
+excess7.sum <- sum(excess7$excess[excess7$date>=params$count.start.date])
 
 ds1<-cbind.data.frame(obs1=y.check[,'FL',1],nat1$all_deaths)
 
