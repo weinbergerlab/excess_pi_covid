@@ -293,6 +293,7 @@ nrevvs.combo.spl <-
   split(nrevvs.combo, nrevvs.combo$state)
 
 nrevvs.combo.spl <- lapply(nrevvs.combo.spl, function(x){
+x<- x[order(x$wk_date),]
 month1 <- month(x$wk_date)
 cont.correct <- min(x$flu_pct_adj_lag1[x$flu_pct_adj_lag1>0], na.rm=T)/2
 x$log.flu.lag1 <- as.numeric(scale(log(x$flu_pct_adj_lag1+cont.correct )))
@@ -318,9 +319,11 @@ nrevvs.combo <- do.call('rbind.data.frame', nrevvs.combo.spl)
 
 
 ```
+
+
 ```{r, eval=F}
-nrevvs.combo.m <- melt(nrevvs.combo[,c('week_end','state','log.flu.deseasonalize.0' )], id.vars=c('state','week_end'))
-nrevvs.combo.c <- dcast(nrevvs.combo.m, week_end~state)
+nrevvs.combo.m <- melt(nrevvs.combo[,c('wk_date','state','log.flu.deseasonalize.0' )], id.vars=c('state','wk_date'))
+nrevvs.combo.c <- dcast(nrevvs.combo.m, wk_date~state)
 matplot(nrevvs.combo.c[,1:10], type='l') 
 matplot(nrevvs.combo.c[,11:20], type='l') 
 
