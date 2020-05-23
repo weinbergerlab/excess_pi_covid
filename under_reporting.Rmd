@@ -430,13 +430,14 @@ complete.prop.est.iter <- lapply(res1,'[[', 'complete.prop.est.iter')
 
 for(i in 1:length(all.preds1)){
   all.preds1[[i]]$state <- names(all.preds1)[i]
-  complete.prop.est.iter[[i]]$state <- names(all.preds1)[i]
+  complete.prop.est.iter[[i]]$state <- names(complete.prop.est.iter)[i]
 }
 
 all.preds.df <- do.call('rbind.data.frame', all.preds1)
 complete.prop.est.iter.df <- do.call('rbind.data.frame', complete.prop.est.iter)
 
 write.csv(all.preds.df,'./outputs/NobBs.preds.csv')
+
 saveRDS(complete.prop.est.iter.df,'./outputs/NobBs.complete.prop.est.iter.df.rds')
 
 prop.report.wk <- sapply(res1,'[[', 'probs')
