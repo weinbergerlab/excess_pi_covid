@@ -395,6 +395,18 @@ jags_extract <- function(ds){
   pred.means <- post_means[pred.index2]
   lambda.means <- post_means[sum.lambda.index]
   
+  #lambda.samps <-
+  #  t(posterior_samples.all[,sum.lambda.index])
+   pred.samps <-
+    t(posterior_samples.all[,pred.index2])
+   
+  #divide obs and predicted
+  complete.prop.est.iter <- 
+    apply(pred.samps,2,function(x) date.sum/x) 
+  
+  complete.prop.est.iter <- 
+    cbind.data.frame('n.weeks.since.death'=(nrow(complete.prop.est.iter)+1):2, complete.prop.est.iter)
+  
   beta.log.means <- as.numeric(post_means[beta.index])
   probs <- exp(beta.log.means)
   probs.samps <- posterior_samples.all[,beta.index]
@@ -407,19 +419,25 @@ jags_extract <- function(ds){
   
   all.preds <- cbind.data.frame(all.preds, 'obs'=date.sum, 'death_date'=death_date)
   
-  out.list=list('preds'=all.preds,'probs'=probs,'probs.samps'=probs.samps )
+  out.list=list('preds'=all.preds,'probs'=probs,'probs.samps'=probs.samps ,'lambda.samps'=lambda.samps,'complete.prop.est.iter'=complete.prop.est.iter)
   return(out.list)
 }
 
 res1 <- lapply(mod1, jags_extract)
 all.preds1 <- lapply(res1,'[[', 'preds')
+complete.prop.est.iter <- lapply(res1,'[[', 'complete.prop.est.iter')
+
 
 for(i in 1:length(all.preds1)){
   all.preds1[[i]]$state <- names(all.preds1)[i]
+  complete.prop.est.iter[[i]]$state <- names(all.preds1)[i]
 }
 
 all.preds.df <- do.call('rbind.data.frame', all.preds1)
+complete.prop.est.iter.df <- do.call('rbind.data.frame', complete.prop.est.iter)
+
 write.csv(all.preds.df,'./outputs/NobBs.preds.csv')
+saveRDS(complete.prop.est.iter.df,'./outputs/NobBs.complete.prop.est.iter.df.rds')
 
 prop.report.wk <- sapply(res1,'[[', 'probs')
 complete.wk <- apply(prop.report.wk, 2,cumsum)
