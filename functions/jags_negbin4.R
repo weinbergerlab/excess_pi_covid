@@ -16,7 +16,8 @@ model_string_negbin4<-
                     ) 
     }
    
-    sum.lambda[t] <- sum(lambda[t,1:D])
+    sum.lambda[t] <- (1-step(N.first.obs[t]-1.5))*sum(lambda[t,(1:D)]) + 
+            step(N.first.obs[t]-1.5)*(lambda[t,(D+1)] +sum(lambda[t,(N.first.obs[t]+1):D]))
     
     #If D=1 is not observed, use column D+1 and (N.first.obs+1):D first obs is in col D+1
     sum.n[t]  <- (1-step(N.first.obs[t]-1.5))*sum(n[t,(1:D)]) + 

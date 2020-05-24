@@ -880,11 +880,11 @@ sum.pred.iter.ac <-
                 syndrome = 'all_deaths',
                 extract.quantity = "sum.pred.iter")
 
-ac.nat.obs <-    
+ac.nat.obs.state <-    
   excessExtract(ds = ds,
                 syndrome = 'all_deaths',
                 extract.quantity = "y")
-ac.nat.obs <- ac.nat.obs[,dimnames(ac.nat.obs)[[2]]!='US',1]
+ac.nat.obs <- ac.nat.obs.state[,dimnames(ac.nat.obs.state)[[2]]!='US',1]
 ac.nat.obs <- apply(ac.nat.obs,1,sum)
 
 pred.iter.ac <-    
@@ -898,10 +898,11 @@ dimnames(pred.iter.ac2)[[3]] <- dimnames(pred.iter.ac)[[2]]
 
 #remove reporting delay effect from baseline
 pred.iter.ac3 <- array(NA, dim=dim(pred.iter.ac2))
-for(i in 1:dim(pred.iter.ac2)[3]){
+for(i in 1:dim(pred.iter.ac2)[2]){
   pred.iter.ac3[,i,,1] <- pred.iter.ac2[,i,,1]/denom.check[,,1]
 }
 dimnames(pred.iter.ac3) <- dimnames(pred.iter.ac2)
+
 
 complete.prop.est.iter.df.m <-
   melt(complete.prop.est.iter.df, id.vars=c('state','n.weeks.since.death' ))
@@ -927,16 +928,35 @@ complete.prop.est.iter.df.c2 <-
 
 pred.iter.ac4 <- pred.iter.ac3[,,,1] * complete.prop.est.iter.df.c2
 
+#test1<- apply(complete.prop.est.iter.df.c2,c(1,3), quantile, probs=c(0.025,0.5, 0.975))
 
-state.ac.q <- apply(pred.iter.ac4,c(1,3), quantile , probs=c(0.025, 0.5, 0.975))
+dimnames(ac.nat.obs.state)[[1]] <-as.character(dates1)
+obs.state.m <- melt(ac.nat.obs.state)
+names(obs.state.m) <- c('week_start','state','one','obs')
+
+state.ac.q <- apply(pred.iter.ac4,c(1,3), quantile , probs=c(0.025, 0.5, 0.975), na.rm=T)
+dimnames(state.ac.q)[[2]] <- as.character(dates1)
+state.ac.q.m <- melt(state.ac.q)
+state.ac.q.c <- dcast(state.ac.q.m, Var2+Var3~Var1)
+names(state.ac.q.c) <- c('week_start', 'state', 'lpi','pred','upi')
+state.ac.q.c$week_start <-
+  as.Date(state.ac.q.c$week_start)
+stateweek <- MMWRweek(state.ac.q.c$week_start)
+state.ac.q.c <- cbind.data.frame(stateweek,state.ac.q.c)
+state.ac.q.c$week_end <- state.ac.q.c$week_start +6
+
+state.ac.q.c <- merge(state.ac.q.c,obs.state.m, by=c('state','week_start' ))
+state.ac.q.c$unexplained.cases <- 
+  state.ac.q.c$obs - state.ac.q.c$pred
+
 
 #Sum the state-level estimates to get national estimate
 pred.iter.ac2.nat <-
-  pred.iter.ac3[,,dimnames(pred.iter.ac3)[[3]]!='US']
+  pred.iter.ac4[,,dimnames(pred.iter.ac4)[[3]]!='US']
 
 pred.iter.ac2.nat.sum <- apply(pred.iter.ac2.nat,c(1,2),sum)
 
-pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,0.5,0.975)))
+pred.iter.ac2.nat.q <- t(apply(pred.iter.ac2.nat.sum,1, quantile, probs=c(0.025,0.5,0.975), na.rm=T))
 
 res.ac.nat <- cbind.data.frame('week_start'=dates1,'all_cause'=ac.nat.obs,pred.iter.ac2.nat.q)
 names(res.ac.nat) <- c('week_start','obs','lpi','pred','upi')
@@ -965,7 +985,9 @@ sum.excess.deaths.range.ac <-t(
 
 sum.excess.deaths.range.ac <- cbind.data.frame('state'=unique(analysis.data2$state), sum.excess.deaths.range.ac)
 
-res.ac <- format_excess_func(excess_ac_natl,'all_deaths')
+#res.ac <- format_excess_func(excess_ac_natl,'all_deaths')
+
+res.ac <- state.ac.q.c
 
 res.ac <- merge(res.ac,cd1[,c("covid.death.hybrid", 'state', 'week_end')] , by=c('state', 'week_end'))
 
@@ -975,9 +997,13 @@ res.ac <- res.ac[!is.na(res.ac$pred),]
 
 
 #national: sum state estimates
-state.sum.pred.iter.ac <- sum.pred.iter.ac[,dimnames(sum.pred.iter.ac)[[2]]!='US',]
+#state.sum.pred.iter.ac <- sum.pred.iter.ac[,dimnames(sum.pred.iter.ac)[[2]]!='US',]
 
-nat.sum.pred.iter.ac <- apply(state.sum.pred.iter.ac,1,sum)
+eval.indices <- which(dates1 >= params$count.start.date )
+pred.iter.eval <- pred.iter.ac4[eval.indices,,]
+nat.sum.pred.iter.ac <- apply(pred.iter.eval,2,sum)
+
+#nat.sum.pred.iter.ac <- apply(state.sum.pred.iter.ac,1,sum)
 sum.obs.ac.nat <- sum(sum.obs.ac2[names(sum.obs.ac2)!='US'])
 excess.nat.iter <-  sum.obs.ac.nat - nat.sum.pred.iter.ac
 
@@ -1014,7 +1040,7 @@ nat.range.ac
 
 ```{r jama_fig1.plot_ac_natl, fig.width=6, fig.height=5}
 
-nat.range.ac2 <- res.ac.nat
+nat.range.ac2 <- res.ac
 
 res.pi.trim <- res.pi.nat[res.pi.nat$state=='US.agg',c('week_start','pred','obs')]
 res.pi.trim$excess_pic <- 
@@ -1027,7 +1053,7 @@ nat.range.ac2$covid.death.hybrid[is.na(nat.range.ac2$covid.death.hybrid)] <-0
 
 nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 
-stack_plot_func(nat.range.ac2, scale.plot=1.3,legend.loc='bottomleft')
+stack_plot_func(nat.range.ac2[nat.range.ac2$state=='US.agg',], scale.plot=1.3,legend.loc='bottomleft')
 
 ```
 
@@ -1090,6 +1116,23 @@ title("Michigan")
 stack_plot_func(nat.range.ac2.spl[['MA']], legend=F,scale.plot=fig.scaling)
 title("Massachusetts")
 
+```
+
+Other states of interest
+```{r jama.im.other.states, fig.width=8, fig.height=6.5}
+fig.scaling=1.5
+par(mfrow=c(2,2), mar=c(2,4,2,1))
+stack_plot_func(nat.range.ac2.spl[['DE']], legend=F,scale.plot=fig.scaling)
+title("Delaware")
+
+stack_plot_func(nat.range.ac2.spl[['FL']], legend=F,scale.plot=fig.scaling)
+title("Florida")
+
+stack_plot_func(nat.range.ac2.spl[['KY']], legend=T,scale.plot=fig.scaling,legend.loc='bottomleft')
+title("Kentucky")
+
+stack_plot_func(nat.range.ac2.spl[['CA']], legend=F,scale.plot=fig.scaling)
+title("California")
 ```
 
 
