@@ -93,7 +93,7 @@ source('./functions/stack_plot.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(48)) {
+runIfExpired <- function(storeName, f, maxage=hours(9999999)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -1011,7 +1011,7 @@ plot(nat.rat$week_end[nat.rat$week_end>=params$count.start.date], ratio_excss_co
 
 ## JAMA IM Fig 2
 
-```{r jama_im_figs2.3, fig.width=8, fig.height=3.25}
+```{r jama_im_fig2, fig.width=8, fig.height=3.25}
 
 nat.range.ac2 <- res.ac
 
@@ -1407,7 +1407,7 @@ ili.data <- ili.data[ili.data$state %in% state.select,]
 ili.data2 <- merge(ili.data, hhs_states.cw, by='state')
 ili.data2.agg <- aggregate(ili.data2[,c('ilitotal','total_patients')], by=list('state'=ili.data2$state,"week_start"=ili.data2$week_start), FUN=sum)
 
-#ili.data2.agg <- merge(ili.data2.agg, clin4.lags, by.x=c('state','week_start'), by.y=c('state', 'wk_date'))
+ili.data2.agg <- merge(ili.data2.agg, analysis.data2, by.x=c('state','week_start'), by.y=c('state', 'wk_date'))
 
 set.seed(123)
 excess_cases1 <-
@@ -1416,6 +1416,7 @@ excess_cases1 <-
               statevar      = "state",
               denom.var     = "total_patients",
               adj.flu       = "none",
+              covs= c('log.flu.deseasonalize.0'),
               use.syndromes = c("ilitotal"),
               extrapolation.date = "2020-03-01",
               time.res='week')
@@ -1447,9 +1448,9 @@ rr.state.ac <- t(comb2.c[,,'2019','rr.ac'])
 
 ```{r fig4, fig.width=7.3, fig.height=7}
 common.states <- 
-  intersect(colnames(rr.state.pic), colnames(rr.ili2) )
+  intersect(colnames(rr.state.ac), colnames(rr.ili2) )
 
-rr.common.states <- rr.state.pic[,common.states]
+rr.common.states <- rr.state.ac[,common.states]
 n.nonmiss <- sum(!is.na(rr.common.states[,1]))
 rr2.comp <-rr.common.states
 rr2.ili.comp <- rr.ili2[,common.states]
@@ -1458,17 +1459,19 @@ plot.state.rank <-
 
 plot.state.rank <-
   plot.state.rank[order(plot.state.rank$state.rank),]
-  plot.state.indices <- plot.state.rank$state.index
-  
+#plot.state.indices <- plot.state.rank$state.index
+ 
+plot.state.indices <- which(dimnames(rr.common.states)[[2]] %in% (c("NYC",jama.states )))
+
 dates1 <- unique(comb2[,c("week_end_date" ,'year','week')])
 
 dates.plot4 <- seq.Date(from=dates1$week_end_date[dates1$year==2019 & dates1$week==27][1], length.out=52, by='week')
 
 
-par(mfrow=c(5,4), mar=c(2,4,2,2))
+par(mfrow=c(2,2), mar=c(2,4,2,2))
 
 for(i in plot.state.indices){
-    y.range1<-c(0,5)
+    y.range1<-c(0,6)
     if(dimnames(rr.common.states)[[2]][i] %in% state.abb2 ){
       state.name.plot <-    
       state.name2[match(dimnames(rr.common.states)[[2]][i],state.abb2)]
@@ -1481,7 +1484,7 @@ for(i in plot.state.indices){
        type='l',
        col='#e41a1c',
        ylim=y.range1,
-       xlim=c(as.Date(c('2019-07-01')),max(pi.data$week_end)),
+       xlim=c(as.Date(c('2020-03-01')),max(pi.data$week_end)),
        bty='l',
        lty=1,
        xlab='',
@@ -1489,13 +1492,13 @@ for(i in plot.state.indices){
        ylab='Observed/Expected'
        #main=common.states[i]
        )
-    axis(1, at=as.Date(c('2019-07-01', '2019-10-01','2020-01-01', '2020-04-01', '2020-07-01')) , labels= c('Jul','Oct','Jan','Apr','')  )
+    axis(1, at=as.Date(c('2020-03-01', '2020-04-01', '2020-05-01')) , labels= c('Mar','Apr','May')  )
 
       points(dates.plot4[1:nrow(rr2.ili.comp)]         ,
-       exp(rr2.ili.comp[,i]), type='l', col='#377eb8')
+       exp(rr2.ili.comp[,i]), type='l', col='#377eb8', lty=2)
     abline(h=1, col='gray', lty=2)
     
-    text(min(dates.plot4), y=0.2, state.name.plot,pos=4, cex=0.9, offset=0.1, xpd=NA)
+    text(as.Date('2020-03-01'), y=0.2, state.name.plot,pos=4, cex=0.9, offset=0.1, xpd=NA)
 
 
 }
