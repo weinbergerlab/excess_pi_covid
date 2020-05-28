@@ -3,7 +3,7 @@ ts.plot.func <-function(ds.plot=jh3,ylim.adj=0.7, death.var='deaths' ,states.plo
   max.test.all.state<-max(ds.plot$test.week.per.capita[ds.plot$state %in% states.plot], na.rm=T)
  
 #for(i in plot.state.indices){
-for(i in 1:4){
+for(i in 1:length(states.plot)){
     #print(i)
   if(plot.order){
     states.cdc = states.plot
