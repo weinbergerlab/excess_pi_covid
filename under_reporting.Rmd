@@ -36,48 +36,48 @@ library(parallel)
 ```{r}
 #Data from Andrew: NOTE: it looks like July-oct 2019 is missing from these data
 wk11 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data11.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data11.csv')
 wk11$max.date.report <- as.Date('2020-03-14')
 wk11$report.date <- as.Date('2020-03-27')
 
 wk12 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data12.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data12.csv')
 wk12$max.date.report <- as.Date('2020-03-21')
 wk12$report.date <- as.Date('2020-04-03')
 
 wk13 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data13.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data13.csv')
 wk13$max.date.report <- as.Date('2020-03-28')
 wk13$report.date <- as.Date('2020-04-10')
 
 wk15 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data15.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data15.csv')
 wk15$max.date.report <- as.Date('2020-04-11')
 wk15$report.date <- as.Date('2020-04-17')
 
 wk16 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data16.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data16.csv')
 wk16$max.date.report <- as.Date('2020-04-18')
 wk16$report.date <- as.Date('2020-04-24')
 
 wk17 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data17.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data17.csv')
 wk17$max.date.report <- as.Date('2020-04-25')
 wk17$report.date <- as.Date('2020-05-01')
 
 wk18 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data18.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data18.csv')
 wk18$max.date.report <- as.Date('2020-05-02')
 wk18$report.date <- as.Date('2020-05-08')
 
 wk19 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data19.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data19.csv')
 wk19$max.date.report <- as.Date('2020-05-09')
 wk19$report.date <- as.Date('2020-05-15')
 
 
 wk20 <- 
-  read.csv('./archives_do_not_sync/State_Custom_Data20.csv')
+  read.csv('./Archives_FluView_state_data/State_Custom_Data20.csv')
 wk20$max.date.report <- as.Date('2020-05-16')
 wk20$report.date <- as.Date('2020-05-22')
 
@@ -229,11 +229,6 @@ unique(us.test$complete.weeks)
 
 ## read in model
 ```{r}
-#source('./functions/jags_poisson.R')
-#source('./functions/jags_poisson2.R')
-
-#source('./functions/jags_negbin.R')
-#source('./functions/jags_negbin2.R')
 source('./functions/jags_negbin4.R')
 
 
