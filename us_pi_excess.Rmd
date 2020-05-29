@@ -1411,6 +1411,7 @@ excess.combined2$`Expected deaths` <-
 
 excess.combined2$State[excess.combined2$State=='US.agg'] <-'US'
 
+write.csv(excess.combined2, './outputs/Table1.csv')
 htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
 
