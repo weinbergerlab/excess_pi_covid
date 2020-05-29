@@ -5,7 +5,7 @@
 # 'week_start'
 # 'excess_pic'
 
-stack_plot_func <- function(ds, legend=T, scale.plot=1,legend.loc='topleft'){
+stack_plot_func <- function(ds, legend=T, scale.plot=1,legend.loc='topleft', set.ymax=0){
 ds <- ds[!is.na(ds$obs),]
 ds$excess <- ds$obs - ds$pred
 
@@ -28,7 +28,11 @@ ds <- ds[ds$week_start>= as.Date('2020-03-01'),]
 ds$week_end <- ds$week_start + days(6)
 initial.base <- ds$pred[1]
 #yrange.pneu <- range(c(ds$pred, ds$obs, ds$band2),0)
+if(set.ymax==0){
 yrange.pneu <- c(0, initial.base*scale.plot)
+}else{
+        yrange.pneu <- c(0, set.ymax)
+}
 plot(ds$week_end, ds$pred, type='l', ylim=yrange.pneu, col='darkgray', bty='l', ylab='All-cause Deaths', xlab='', lty=2)
 
 polygon(c(ds$week_end, rev(ds$week_end)), c(ds$pred, rev(ds$band1)),col =rgb(141/255,160/255,203/255, alpha = 1), border = NA )

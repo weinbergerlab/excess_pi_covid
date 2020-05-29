@@ -1028,10 +1028,10 @@ nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 
 nat.range.ac2.spl <- split(nat.range.ac2, nat.range.ac2$state)
 par(mfrow=c(1,2), mar=c(2,4,1,1))
-stack_plot_func(nat.range.ac2.spl[['NY']], scale.plot=6.8)
+stack_plot_func(nat.range.ac2.spl[['NY']], set.ymax = 10000)
 title("New York (exclude NYC)")
 
-stack_plot_func(nat.range.ac2.spl[['NYC']], legend=F, scale.plot=6.8)
+stack_plot_func(nat.range.ac2.spl[['NYC']], legend=F,  set.ymax = 10000)
 title("New York City")
 
 ```
@@ -1039,19 +1039,33 @@ title("New York City")
 ## JAMA IM Fig 3
 
 ```{r jama.im.fig3, fig.width=8, fig.height=6.5}
-fig.scaling=3
+fig.scaling=1
 par(mfrow=c(2,2), mar=c(2,4,2,1))
-stack_plot_func(nat.range.ac2.spl[['NJ']], legend=F,scale.plot=fig.scaling)
+stack_plot_func(nat.range.ac2.spl[['NJ']], legend=F,scale.plot=fig.scaling, set.ymax = 4500)
 title("New Jersey")
 
-stack_plot_func(nat.range.ac2.spl[['IL']], legend=F,scale.plot=fig.scaling)
+stack_plot_func(nat.range.ac2.spl[['IL']], legend=F,scale.plot=fig.scaling, set.ymax = 4500)
 title("Illinois")
 
-stack_plot_func(nat.range.ac2.spl[['MI']], legend=T,scale.plot=fig.scaling)
+stack_plot_func(nat.range.ac2.spl[['MI']], legend=T,scale.plot=fig.scaling, set.ymax = 4500,legend.loc='bottomleft')
 title("Michigan")
 
-stack_plot_func(nat.range.ac2.spl[['MA']], legend=F,scale.plot=fig.scaling)
+stack_plot_func(nat.range.ac2.spl[['MA']], legend=F,scale.plot=fig.scaling, set.ymax = 4500)
 title("Massachusetts")
+
+```
+
+## JAMA IM Fig s2
+
+```{r jama.im.fig.s2, fig.width=8, fig.height=6.5}
+fig.scaling=3
+par(mfrow=c(3,3), mar=c(2,4,2,1))
+
+for(i in c('LA','MD','CO','GA','VA','TX','CA','AZ','FL') ){
+stack_plot_func(nat.range.ac2.spl[[i]], legend=(i=='LA'),scale.plot=fig.scaling)
+title(state.name2[match(i,state.abb2)])
+}
+
 
 ```
 
@@ -1298,6 +1312,21 @@ title(xlab = "Date",
 
 ```
 
+```{r fig.s5.jama.int.med, fig.width=8, fig.height=5}
+## uses NCHS covid deaths for reported deaths
+jh3.trim <- jh3[jh3$week_end_date<=end.data.date & jh3$week_end_date>=params$count.start.date,]
+  par(mfrow=c(3,3), mar=c(2,4,3,1), oma = c(3,3,0,3) + 0.1)
+ts.plot.func(ds.plot=jh3.trim,   states.plot=c('NJ','LA','MI','MD','IL','CO','AZ','GA','FL'),ylim.adj=15.0 ,death.var="covid.death.hybrid" ,plot.order=T, plot.excess='ac')
+
+title(xlab = "Date",
+      ylab = "N Deaths",
+      outer = TRUE, line = 1, cex=1.0)
+   mtext(text="Tests/1000 people", line=2,side=4,outer=TRUE, cex=0.75, col='gray')
+
+   
+
+```
+
 
 #NCHS vs COVIDtracking.com data
 ```{r}
@@ -1379,6 +1408,8 @@ names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess
 
 excess.combined2$`Expected deaths` <-
   round(excess.combined2$`Expected deaths`, -2)
+
+excess.combined2$State[excess.combined2$State=='US.agg'] <-'US'
 
 htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
 ```
@@ -1588,7 +1619,7 @@ all.deaths.provis$Week <-
 
 cols1 <-c('#fdcc8a','#b30000')
 matplot(all.deaths.provis$epiwk ,all.deaths.provis[,c('2018-2019','2019-2020')], type='l', bty='l',col=cols1, main=paste0('Provisional deaths, week ',week.test,  ' FluView'),xlab='', lty=1:4, ylim=c(0, max(all.deaths.provis[,c('2018-2019','2019-2020')]) ), xaxt='n'   , ylab='Provisional Deaths')
-legend('bottomleft',col=cols1, lty=1:4, ncol=2)
+legend('bottomleft',legend=c('2018-19','2019-20'),col=cols1, lty=1:4, ncol=2)
 axis(side=1, at=c(1,14,27,40,52), labels=c('Jul','Oct','Jan','Apr',''))
 
 diff <- all.deaths.provis$`2019-2020` -
