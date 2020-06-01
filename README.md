@@ -9,3 +9,5 @@ The code is set up to automatically pull the latest version of data from NCHS. I
 
 A snapshot of the repository, as used in the most recent analyses through May 9 can be found here:
 [![DOI](https://zenodo.org/badge/252549546.svg)](https://zenodo.org/badge/latestdoi/252549546)
+
+The most recent results can be seen at https://weinbergerlab.github.io/excess_pi_covid/
