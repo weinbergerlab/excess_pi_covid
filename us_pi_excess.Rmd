@@ -1408,7 +1408,7 @@ title(xlab = "Date",
 
 ```{r}
 #Compare covid track death and NCHS deaths
-for(i in c('NY','LA')){
+for(i in c('MA','LA')){
 st1 <- jh3[jh3$state==i,]
 plot(st1$week_end_date ,st1$covid.track.death, type='l', main=i)
 points (st1$week_end_date ,st1$covid.death.hybrid,type='l', col='red')
