@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
-author: "Dan Weinberger"
-date: "5/15/2020"
+author: ""
+date: "5/31/2020"
 output:
   html_document:
     df_print: paged
@@ -20,9 +20,18 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-05-09'
+  end.data.date: '2020-05-16'
 ---
 
+Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
+
+^1^Department of Epidemiology of Microbial Diseases and the Public Health Modeling Unit, Yale School of Public Health, New Haven, CT
+^2^Department of Biostatistics and the Public Health Modeling Unit, Yale School of Public Health, New Haven, CT; Yale Departments of Ecology and Evolutionary Biology, Statistics & Data Science, Yale School of Management
+^3^Aledade, Inc
+^4^Department of Health and Mental Hygiene, New York City, NY
+^5^Department of Biostatistics and Epidemiology, School of Public Health and Health Sciences, University of Massachusetts, Amherst, MA
+^6^Department of Science and Environment, Roskilde University, Denmark
+^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
 ```{r, include = F}
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -332,9 +341,6 @@ matplot(nrevvs.combo.c[,c('TX','FL','NY')], type='l')
 ```
 
 
-### Explanation of NCHS data sources
-NCHS mostly provides data based on location of death rather than location of residence. For states like Florida, where there is a large population of seasonal residents, this can make a big difference. NCHS also info on underlying cause for specific causes like pneumonia&influenza. The exception to this is the new P&I&Coronavirus data, which is based on multiple-cause of death statistics CDC fluview provides data on all-cause and P&I based on location of residence, and provides information on multiple-cause (e.g., P&I listed anywhere on death certificate.) To get a baseline for all-cause deaths, we use the NCHS all-cause data, and combine this with the covidView all-cause data. For excess P&I&C, we use combine the all-cause data from NCHS from the baseline period with the *proportion* of deaths that are due to P&I. The assumption is that this proportion is the same for deaths based on residence and location of death. We then back-calculate the number of deaths that were P&I from this number and combine with the updated covidView data.
-
 ```{r}
 #Reporting delays from NobBS
 delays <- readRDS('./outputs/NobBs.complete.iters.rds')
@@ -422,6 +428,9 @@ pi.data.not.miss.states <-
 ```
 
 ```{r import_cdc_covid_view}
+### Explanation of NCHS data sources
+#NCHS mostly provides data based on location of death rather than location of residence. For states like Florida, where there is a large population of seasonal residents, this can make a big difference. NCHS also info on underlying cause for specific causes like pneumonia&influenza. The exception to this is the new P&I&Coronavirus data, which is based on multiple-cause of death statistics CDC fluview provides data on all-cause and P&I based on location of residence, and provides information on multiple-cause (e.g., P&I listed anywhere on death certificate.) To get a baseline for all-cause deaths, we use the NCHS all-cause data, and combine this with the covidView all-cause data. For excess P&I&C, we use combine the all-cause data from NCHS from the baseline period with the *proportion* of deaths that are due to P&I. The assumption is that this proportion is the same for deaths based on residence and location of death. We then back-calculate the number of deaths that were P&I from this number and combine with the updated covidView data.
+
 #official CDC data, updated daily on P&I, covid, all deaths
 
 #url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json" #no longer being updated as of Apr 30
@@ -663,33 +672,22 @@ cd1$covid.death.hybrid[cd1$covid.death.hybrid==0 & cd1$covid.track.death<10 & !i
 
 ### Mortality data on deaths due to pneumonia & influenza through the week ending `r  date.print`
 
-Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^ 
 
-^1^Department of Epidemiology of Microbial Diseases and the Public Health Modeling Unit, Yale School of Public Health, New Haven, CT
-^2^Department of Biostatistics and the Public Health Modeling Unit, Yale School of Public Health, New Haven, CT; Yale Departments of Ecology and Evolutionary Biology, Statistics & Data Science, Yale School of Management
-^3^Aledade, Inc
-^4^Department of Health and Mental Hygiene, New York City, NY
-^5^Department of Biostatistics and Epidemiology, School of Public Health and Health Sciences, University of Massachusetts, Amherst, MA
-^6^Department of Science and Environment, Roskilde University, Denmark
-^7^Division of International Epidemiology and Population Studies, Fogarty International Center, National Institutes of Health, Bethesda, MD
-
-## Abstract
+## Overview
 
 *Background* 
 Efforts to track the severity and public health impact of the novel coronavirus, COVID-19, in the US have been hampered by testing issues, reporting lags, and inconsistency between states. Evaluating unexplained increases in deaths attributed to broad outcomes, such as pneumonia and influenza or due to all causes, can provide a more complete and consistent picture of the burden caused by COVID-19. 
 
 *Methods*
-We evaluated increases in the occurrence of deaths due to any cause above a seasonal baseline  (adjusted for influenza activity) or deaths due to coronaivirus/P&I (P&I&C) for March-early-April across the United States. These estimates are compared with reported deaths due to COVID-19 and with testing data.
-
-*Results*
-There were notable increases in the rate of death due to all-causes and due to P&I&C in March and early-April 2020. In a number of states, these deaths pre-dated increases in COVID-19 testing rates and were not counted in official records at the time as related to COVID-19. There was substantial variability between states in the discrepancy between reported rates of death due to COVID-19 and the estimated burden of excess deaths due to P&I. The increase in all-cause deaths is approximately 50% higher than the official tally of COVID-19 reported deaths during the study period. 
+We evaluated increases in the occurrence of deaths due to any cause above a seasonal baseline  (adjusted for influenza activity) or deaths due to coronaivirus/P&I (P&I&C) for March-early-May across the United States. These estimates are compared with reported deaths due to COVID-19 and with testing data. Detailed methods can be found [here](https://github.com/weinbergerlab/excess_pi_covid/blob/master/post%20methods.pdf)
 
 *Conclusions*
 Excess deaths provide an estimate of full COVID-19 burden and indicate that official tallies likely undercount deaths due to the virus.
 
 
-## National analysis of P&I
 ```{r natl_pi_analysis, include=F}
+## National analysis of P&I
+
 #Run analysis
 analysis.data$one <- 1
 analysis.data2 <-
@@ -807,13 +805,14 @@ sum.excess.deaths.range.pi$state <- as.character(sum.excess.deaths.range.pi$stat
 sum.excess.deaths.range.pi$state[is.na(sum.excess.deaths.range.pi$state)] <- 'US.agg'
 ```
 
-Excess deaths due to pneumonia/influenza/covid nationally in the specified time period
-```{r, eval= !params$web.version}
+```{r, eval= F}
+#Excess deaths due to pneumonia/influenza/covid nationally in the specified time period
+
 sum.excess.deaths.range.pi <- sum.excess.deaths.range.pi[order(-sum.excess.deaths.range.pi$`50%`),]
 print(sum.excess.deaths.range.pi)
 ```
 
-```{r natl_pi_plot}
+```{r natl_pi_plot, eval=F}
 
 natplot <- res.pi.nat[res.pi.nat$state=='US.agg',]
 yrange.pneu <- range(c(res.pi.nat$pred, res.pi.nat$obs, res.pi.nat$upi,0))
@@ -830,9 +829,9 @@ abline(h=1)
 ```
 
 
-## National analysis of all-cause 
 
-```{r, include=F}
+```{r main analysis, include=F}
+## National analysis of all-cause 
 
 #Run analysis
 analysis.data$one <- 1
@@ -954,11 +953,9 @@ sum.excess.deaths.range.ac$state[is.na(sum.excess.deaths.range.ac$state)] <- 'US
 
 ```
 
-```{r }
+```{r, include=F }
 #print(sum.excess.deaths.range.ac)
-
 nat.range.ac <-sum.excess.deaths.range.ac.nat
-
 formatted.ac <- 
   paste0(round(nat.range.ac['50%'],-2),
                       '(' ,
@@ -967,13 +964,12 @@ formatted.ac <-
                       )
 formatted.ac
 nat.range.ac
-
 ```
 
+Estimate for national excess deaths: `r print(formatted.ac)`
 
-`r if(!params$web.version){print(formatted.ac)}`
-
-## JAMA IM Fig 1
+## National all-cause excess
+Excess deaths for the United States from March 1, 2020 through `r last.date.format`. The observed number of deaths is indicated by the black solid line, and the expected number of deaths, adjusting for seasonality, influenza epidemics, and reporting delays, is indicated by the black dashed line. The area between these two lines represents the total number of excess deaths. The blue area represents deaths recorded as due to COVID-19, the red shaded area presents additional pneumonia and influenza excess deaths not coded as due to COVID-19, and the green shaded area represents deaths that were not attributed to COVID-19 or pneumonia or influenza.
 
 ```{r jama_fig1.plot_ac_natl, fig.width=6, fig.height=5}
 
@@ -1009,7 +1005,8 @@ plot(nat.rat$week_end[nat.rat$week_end>=params$count.start.date], ratio_excss_co
 }
 ```
 
-## JAMA IM Fig 2
+## Excess deaths in New York City and the rest of New York
+Excess deaths for New York state (excluding New York City) and for New York City from March 1, 2020 through `r last.date.format`. The observed number of deaths is indicated by the black solid line, and the expected number of deaths, adjusting for seasonality, influenza epidemics, and reporting delays, is indicated by the black dashed line. The area between these two lines represents the total number of excess deaths. The blue area represents deaths recorded as due to COVID-19, the red shaded area presents additional pneumonia and influenza excess deaths not coded as due to COVID-19, and the green shaded area represents deaths that were not attributed to COVID-19 or pneumonia or influenza.
 
 ```{r jama_im_fig2, fig.width=8, fig.height=3.25}
 
@@ -1036,7 +1033,8 @@ title("New York City")
 
 ```
 
-## JAMA IM Fig 3
+## Excess deaths in four high-incidence states
+Excess deaths for four states that had large numbers of reported COVID-19 deaths from March 1, 2020 through `r last.date.format`. The observed number of deaths is indicated by the black solid line, and the expected number of deaths, adjusting for seasonality, influenza epidemics, and reporting delays, is indicated by the black dashed line. Area between these two lines represents the total number of excess deaths. The blue area represents deaths recorded as due to COVID-19, the red shaded area presents additional pneumonia and influenza excess deaths not coded as due to COVID-19, and the green shaded area represents deaths that were not attributed to COVID-19 or pneumonia or influenza.
 
 ```{r jama.im.fig3, fig.width=8, fig.height=6.5}
 fig.scaling=1
@@ -1055,7 +1053,8 @@ title("Massachusetts")
 
 ```
 
-## JAMA IM Fig s2
+## Excess deaths in select additional states
+Excess deaths for additional states from March 1, 2020 through `r last.date.format`. The observed number of deaths is indicated by the black solid line, and the expected number of deaths, adjusting for seasonality, influenza epidemics, and reporting delays, is indicated by the black dashed line. Area between these two lines represents the total number of excess deaths. The blue area represents deaths recorded as due to COVID-19, the red shaded area presents additional pneumonia and influenza excess deaths not coded as due to COVID-19, and the green shaded area represents deaths that were not attributed to COVID-19 or pneumonia or influenza.
 
 ```{r jama.im.fig.s2, fig.width=8, fig.height=6.5}
 fig.scaling=3
@@ -1101,8 +1100,85 @@ write.csv(comb2,'./outputs/national_and_state_summary.csv' )
 ```
 
 
-## Figure 1: Observed weekly death rate due to any cause vs seasonal baseline (+/-95% Prediction Interval) 
- The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
+
+
+## Summary Table: Excess deaths and reported deaths due to COVID-19
+
+```{r, table1}
+comb3 <- comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,]
+comb3 <- comb3[comb3$state !='US',]
+
+nchs.tot.deaths <- aggregate(comb3[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date,                           c("covid.death.hybrid",'covid.track.death',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb3$state[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
+
+sum.excess.deaths.range.ac <- as.data.frame(sum.excess.deaths.range.ac)
+formatted.excess.ac <- 
+  paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
+                      ' (' ,
+                      round(sum.excess.deaths.range.ac[,'2.5%'],-2), ',' ,
+                      round(sum.excess.deaths.range.ac[,'97.5%'],-2), ')'
+                      )
+formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.excess.ac)
+
+sum.excess.deaths.range.pi <-
+  as.data.frame(sum.excess.deaths.range.pi)
+
+formatted.excess.pic <- 
+  paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
+                      ' (' ,
+                      round(sum.excess.deaths.range.pi[,'2.5%'],-1), ',' ,
+                      round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
+                      )
+formatted.excess.pic <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state, 'Excess P&I&C'= formatted.excess.pic)
+
+sum.excess.deaths.range.ac.inc <- merge(sum.excess.deaths.range.ac, pop2, by='state', all=T)
+sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='US.agg'] <- 328200000
+
+#NYcity and nY state set pop manually
+sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='NYC'] <- 8399900
+
+sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='NY'] <- 19450000- 8399900
+
+
+formatted.excess.ac.INC <- 
+  paste0(round(sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1),
+                      ' (' ,
+                      round(sum.excess.deaths.range.ac.inc[,'2.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ',' ,
+                      round(sum.excess.deaths.range.ac.inc[,'97.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ')'
+                      )
+formatted.excess.ac.INC <- cbind.data.frame('state'=sum.excess.deaths.range.ac.inc$state, 'Excess all-cause deaths/100,000'= formatted.excess.ac.INC, "excess.inc.raw"=sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000)
+
+excess.combined <-
+  merge(formatted.excess.pic,formatted.excess.ac.INC, by='state')
+
+excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
+excess.combined <- merge(nchs.tot.deaths, excess.combined,by='state')
+#excess.combined
+#sort by incidence
+excess.combined$excess.inc.raw[excess.combined$state=='US.agg'] <- 99999999
+order.states <- rev(order(excess.combined$excess.inc.raw))
+order.states <- order.states 
+excess.combined <- excess.combined[order.states,]
+
+percent_coded_covid <-
+ round( excess.combined$covid.death.hybrid/(excess.combined$all_cause_deaths-excess.combined$baseline_all_cause)*100)
+percent_coded_covid <- cbind.data.frame(percent_coded_covid, excess.combined$state)
+
+excess.combined2 <-
+  excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'covid.death.hybrid', "Excess P&I&C", "Excess all-cause deaths/100,000")]
+
+names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess all-cause deaths', 'COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths',  'Excess all-cause deaths/100,000')
+
+excess.combined2$`Expected deaths` <-
+  round(excess.combined2$`Expected deaths`, -2)
+
+excess.combined2$State[excess.combined2$State=='US.agg'] <-'US'
+
+write.csv(excess.combined2, './outputs/Table1.csv')
+htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
+```
+
+## Observed weekly death rate due to any cause vs seasonal baseline (+/-95% Prediction Interval) 
+The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
 
 ```{r recast_summary_data}
 #recast the summary data as an array
@@ -1206,7 +1282,7 @@ for(i in plot.state.indices){
   }
 ```
 
-## Figure 2: Observed weekly death rate due to pneumonia/influenza/covid-19 vs seasonal baseline for pneumonia&influenza (+/-95% Prediction Interval) 
+## Observed weekly death rate due to pneumonia/influenza/covid-19 vs seasonal baseline for pneumonia&influenza (+/-95% Prediction Interval) 
  The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza & Covid-19 (P&I&C) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I&C data is for the week ending `r  max(dates1)+6`.
  
 ```{r fig2, fig.width=7.3, fig.height=6.9}
@@ -1281,8 +1357,8 @@ for(i in plot.state.indices){
 ```
 
 
-## JAMA-IM fig 4: Reported number of COVID-19 deaths,compared with the excess deaths due to pneumonia and influenza in each week, by state. 
-The red line shows the number of excess P&I cases +/-95% prediction intervals. The blue solid line shows the reported number of COVID-19 deaths for the same week (as compiled by covidtracking.com), and the dotted blue line shows the reported COVID-19 deaths for weeks in which the CDC data were not yet reliable. The grey dashed line represents number of tests performed per-capita in that week. 
+## Reported number of COVID-19 deaths,compared with the excess deaths due to all causes in each week, by state. 
+Trends in excess mortality due to all causes (red solid line +/- 95% prediction intervals) or reported deaths due to COVID-19 (blue dotted line) for March 1, 2020 through May 9, 2020. The thick dashed gray line shows the volume of tests performed per 1000 people in that week.
 
 ```{r}
 
@@ -1308,9 +1384,9 @@ title(xlab = "Date",
       outer = TRUE, line = 1, cex=1.0)
    mtext(text="Tests/1000 people", line=2,side=4,outer=TRUE, cex=0.75, col='gray')
 
-   
-
 ```
+
+Same thing, for additional states
 
 ```{r fig.s5.jama.int.med, fig.width=8, fig.height=5}
 ## uses NCHS covid deaths for reported deaths
@@ -1328,9 +1404,10 @@ title(xlab = "Date",
 ```
 
 
-#NCHS vs COVIDtracking.com data
+## NCHS vs COVIDtracking.com data
+
 ```{r}
-#Compare covid trakc death and NCHS deaths
+#Compare covid track death and NCHS deaths
 for(i in c('NY','LA')){
 st1 <- jh3[jh3$state==i,]
 plot(st1$week_end_date ,st1$covid.track.death, type='l', main=i)
@@ -1340,87 +1417,11 @@ legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red')
 ```
 
 
-## Table 1: Excess P&I deaths and reported deaths due to COVID-19
-
-```{r, table1}
-comb3 <- comb2[comb2$week_end_date>=count.start.date & comb2$week_end_date<=end.data.date,]
-comb3 <- comb3[comb3$state !='US',]
-
-nchs.tot.deaths <- aggregate(comb3[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date,                           c("covid.death.hybrid",'covid.track.death',"baseline_all_cause",'all_cause_deaths'  )], by=list('state'=comb3$state[comb3$week_end_date>=count.start.date & comb3$week_end_date<=end.data.date]), FUN=sum, na.rm=T)
-
-sum.excess.deaths.range.ac <- as.data.frame(sum.excess.deaths.range.ac)
-formatted.excess.ac <- 
-  paste0(round(sum.excess.deaths.range.ac[,'50%'],-2),
-                      ' (' ,
-                      round(sum.excess.deaths.range.ac[,'2.5%'],-2), ',' ,
-                      round(sum.excess.deaths.range.ac[,'97.5%'],-2), ')'
-                      )
-formatted.excess.ac <- cbind.data.frame('state'=sum.excess.deaths.range.ac$state,formatted.excess.ac)
-
-sum.excess.deaths.range.pi <-
-  as.data.frame(sum.excess.deaths.range.pi)
-
-formatted.excess.pic <- 
-  paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
-                      ' (' ,
-                      round(sum.excess.deaths.range.pi[,'2.5%'],-1), ',' ,
-                      round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
-                      )
-formatted.excess.pic <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state, 'Excess P&I&C'= formatted.excess.pic)
-
-sum.excess.deaths.range.ac.inc <- merge(sum.excess.deaths.range.ac, pop2, by='state', all=T)
-sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='US.agg'] <- 328200000
-
-#NYcity and nY state set pop manually
-sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='NYC'] <- 8399900
-
-sum.excess.deaths.range.ac.inc$census_bureau_pop_2019[sum.excess.deaths.range.ac.inc$state=='NY'] <- 19450000- 8399900
 
 
-formatted.excess.ac.INC <- 
-  paste0(round(sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1),
-                      ' (' ,
-                      round(sum.excess.deaths.range.ac.inc[,'2.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ',' ,
-                      round(sum.excess.deaths.range.ac.inc[,'97.5%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000,1), ')'
-                      )
-formatted.excess.ac.INC <- cbind.data.frame('state'=sum.excess.deaths.range.ac.inc$state, 'Excess all-cause deaths/100,000'= formatted.excess.ac.INC, "excess.inc.raw"=sum.excess.deaths.range.ac.inc[,'50%']/sum.excess.deaths.range.ac.inc[,'census_bureau_pop_2019']*100000)
+## Compare Excess all-cause mortality vs Excess ILI
 
-excess.combined <-
-  merge(formatted.excess.pic,formatted.excess.ac.INC, by='state')
-
-excess.combined <- merge(formatted.excess.ac, excess.combined,by='state')
-excess.combined <- merge(nchs.tot.deaths, excess.combined,by='state')
-#excess.combined
-#sort by incidence
-excess.combined$excess.inc.raw[excess.combined$state=='US.agg'] <- 99999999
-order.states <- rev(order(excess.combined$excess.inc.raw))
-order.states <- order.states 
-excess.combined <- excess.combined[order.states,]
-
-percent_coded_covid <-
- round( excess.combined$covid.death.hybrid/(excess.combined$all_cause_deaths-excess.combined$baseline_all_cause)*100)
-percent_coded_covid <- cbind.data.frame(percent_coded_covid, excess.combined$state)
-
-excess.combined2 <-
-  excess.combined[,c('state',"all_cause_deaths","baseline_all_cause", "formatted.excess.ac",'covid.death.hybrid', "Excess P&I&C", "Excess all-cause deaths/100,000")]
-
-names(excess.combined2) <- c('State','Observed Deaths','Expected deaths','Excess all-cause deaths', 'COVID-19 deaths (U07.1)', 'Excess Pneumonia/Influenza/Covid-19 deaths',  'Excess all-cause deaths/100,000')
-
-excess.combined2$`Expected deaths` <-
-  round(excess.combined2$`Expected deaths`, -2)
-
-excess.combined2$State[excess.combined2$State=='US.agg'] <-'US'
-
-write.csv(excess.combined2, './outputs/Table1.csv')
-htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to COVID-19, pneumonia/influenza/Covid-19, and all-causes COVID-19, from March 1, 2020 through ', last.date.format), rnames=F)
-```
-
-
-
-
-## Figure 4: Compare Excess P&I mortality vs Excess ILI
-
-Here we compare the observed vs expected number of deaths due to pneumonia and influenza in each week compare to the observed vs expected number of outpatient visits for influenza-like illness (ILI) in each week. we would expect ILI (blue line) to increase earlier than deaths (red line)
+Here we compare the observed vs expected number of deaths due to all causes in each week compared to the observed vs expected number of outpatient visits for influenza-like illness (ILI) in each week. we would expect ILI (blue line) to increase earlier than deaths (red line)
 
 ```{r, include=F}
 #ARCHIVE
@@ -1547,7 +1548,7 @@ if(i==plot.state.indices[1]){
 
 
 
-## Figure S1: Evaluation of reporting Delays
+## Evaluation of reporting delays with provisional data
 ```{r, eval=F}
 ## Scrape old data from NCHS
 
@@ -1562,7 +1563,7 @@ j='2019-2020'
 
 ```{r fig.s1, fig.width=10, fig.height=4}
 par(mfrow=c(1,2))
-for(week.test in c('11','20')){ #week for which CDCfluview is for
+for(week.test in c('11','21')){ #week for which CDCfluview is for
 
 
 provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
@@ -1628,7 +1629,7 @@ diff <- all.deaths.provis$`2019-2020` -
 
 all.deaths.provis.eval <-
   all.deaths.provis[all.deaths.provis$Week >=10 &
-                      all.deaths.provis$Week<=19,]
+                      all.deaths.provis$Week<=20,]
 eval.sum <- apply(all.deaths.provis.eval[,-c(1:3)],2,sum)
 eval.sum['2019-2020'] - eval.sum['2018-2019']
 n.weeks.sum <- nrow(all.deaths.provis.eval)
@@ -1648,84 +1649,11 @@ excess.unadj <-eval.sum['2019-2020'] - eval.sum['2018-2019']
 
 excess.adj <- excess.unadj- ave.excess.baseline.week*n.weeks.sum
 
-
-excess.adj
-excess.unadj
-
 ```
+There were `r round(excess.unadj,-2)` more deaths reported in provisional statistics for 2020 than 2019 since March 1. Adjusting for variations in deaths between the two years, there were `r round(excess.adj,-2)` more deaths in 2020.
 
 
-
-## Table S1: Adjust for flu: P&I
-
-```{r, include=F} 
-#Run analysis 
-set.seed(123)
-excess_deaths1.adjusted <-
-  excessCases(ds = analysis.data2,
-              datevar       = "week_end",
-              statevar      = "state",
-              adj.flu       = "none",
-              denom.var     = "nchs.total.deaths",
-              use.syndromes = c("nchs.pic"),
-              extrapolation.date = extrap.date ,
-              sum.dates = count.start.date,
-              model.type='poisson',
-              time.res='week')
-```
- 
-```{r}
-#Extract the data needed to plot from the results
-ds <- excess_deaths1.adjusted
-
-sum.pred.iter.adj <-    
-  excessExtract(ds = ds,
-                syndrome = 'nchs.pic',
-                extract.quantity = "sum.pred.iter")
-
-sum.obs.adj <-
-    excessExtract(ds = ds,
-                syndrome = 'nchs.pic',
-                extract.quantity = "sum.obs")
-
-sum.obs.state.adj <- apply(sum.obs.adj,2,sum)
-
-sum.cases.excess.adj <- sapply(1:length(sum.obs.state.adj),
-                           function(x){
-  sum.obs.state.adj[x] -  sum.pred.iter.adj[,x,1]
-  })
-
-sum.excess.deaths.range.pi.adj <-t(
-  apply(sum.cases.excess.adj,2,quantile,  probs=c(0.025,0.5,0.975)))
-
-sum.excess.deaths.range.pi.adj <- cbind.data.frame('state'=unique(analysis.data2$state), sum.excess.deaths.range.pi.adj)
-
-formatted.pic.adj <- 
-  paste0(round(sum.excess.deaths.range.pi.adj[,'50%'],-1),
-                      '(' ,
-                      round(sum.excess.deaths.range.pi.adj[,'2.5%'],-1), ',' ,
-                      round(sum.excess.deaths.range.pi.adj[,'97.5%'],-1), ')'
-                      )
-formatted.pic.adj <- cbind.data.frame('state'=sum.excess.deaths.range.pi.adj$state,formatted.pic.adj)
-
-formatted.pic.unadj <- 
-  paste0(round(sum.excess.deaths.range.pi[,'50%'],-1),
-                      '(' ,
-                      round(sum.excess.deaths.range.pi[,'2.5%'],-1), ',' ,
-                      round(sum.excess.deaths.range.pi[,'97.5%'],-1), ')'
-                      )
-
-formatted.pic.unadj <- cbind.data.frame('state'=sum.excess.deaths.range.pi$state,formatted.pic.unadj)
-
-summary.table.adj.unadj <- merge(formatted.pic.adj,formatted.pic.unadj, by='state')
-
-names(summary.table.adj.unadj) <- c('State','Excess P&I&C, unadjusted for influenza', 'Excess P&I&C, adjusted for influenza')
-htmlTable(summary.table.adj.unadj, caption='Comparison of excess deaths due to pneumonia/influenza/Covid-19, as estimated from a regression that adjusts for influenza with a regression that does not')
-
-```
-
-  
-## Table S2: Do not Adjust for flu: all-cause
+## Sensitivity analysis: do not Adjust for flu
 
 ```{r, include=F} 
 #Run analysis 
@@ -1822,9 +1750,7 @@ matplot(us.nv[1:26,], type='l')
 #NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
 ```
 
-```{r, fig.s5}
-matplot(2:(nrow(delays.med)+1),delays.med, type='l', bty='l', ylab='Proportion reported', xlab='Weeks after death')
-```
+
 
 
 ```{r, eval=F}
