@@ -81,11 +81,21 @@ wk20 <-
 wk20$max.date.report <- as.Date('2020-05-16')
 wk20$report.date <- as.Date('2020-05-22')
 
+wk21 <- 
+  read.csv('./Archives_FluView_state_data/State_Custom_Data21.csv')
+wk21$max.date.report <- as.Date('2020-05-23')
+wk21$report.date <- as.Date('2020-05-29')
+
+wk22 <- 
+  read.csv('./Archives_FluView_state_data/State_Custom_Data22.csv')
+wk22$max.date.report <- as.Date('2020-05-30')
+wk22$report.date <- as.Date('2020-06-05')
+
 
 #Read in national data
 
 
-provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20'),
+provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22'),
                       function(x){
   d1 <- read.csv(paste0('./Data/provisional_pi/provisional', '2019-2020','_','week_',x,'.csv'))
   names(d1) <- toupper(names(d1))
@@ -100,7 +110,7 @@ provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','
     })
 nat.reports <- do.call('rbind.data.frame',provis.list)
 
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20)
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22)
 
 
 all.reports$epiyr <-
@@ -414,7 +424,7 @@ jags_extract <- function(ds){
   
   all.preds <- cbind.data.frame(all.preds, 'obs'=date.sum, 'death_date'=death_date)
   
-  out.list=list('preds'=all.preds,'probs'=probs,'probs.samps'=probs.samps ,'lambda.samps'=lambda.samps,'complete.prop.est.iter'=complete.prop.est.iter)
+  out.list=list('preds'=all.preds,'probs'=probs,'probs.samps'=probs.samps,'complete.prop.est.iter'=complete.prop.est.iter)
   return(out.list)
 }
 

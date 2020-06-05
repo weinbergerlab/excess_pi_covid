@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "5/31/2020"
+date: "6/5/2020"
 output:
   html_document:
     df_print: paged
@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-05-16'
+  end.data.date: '2020-05-23'
 ---
 
 Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
@@ -1178,7 +1178,7 @@ htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to CO
 ```
 
 ## Observed weekly death rate due to any cause vs seasonal baseline (+/-95% Prediction Interval) 
-The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I data is for the week ending `r  max(dates1)+6`.
+The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest data are for the week ending `r  max(dates1)+6`.
 
 ```{r recast_summary_data}
 #recast the summary data as an array
@@ -1563,7 +1563,7 @@ j='2019-2020'
 
 ```{r fig.s1, fig.width=10, fig.height=4}
 par(mfrow=c(1,2))
-for(week.test in c('11','21')){ #week for which CDCfluview is for
+for(week.test in c('11','22')){ #week for which CDCfluview is for
 
 
 provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
@@ -1638,7 +1638,9 @@ all.deaths.provis.eval.comp <-
   all.deaths.provis[all.deaths.provis$Week >=1 &
                       all.deaths.provis$Week<=9,]
 eval.sum.comp <- apply(all.deaths.provis.eval.comp[,-c(1:3)],2,sum)
+
 diff.base <- eval.sum.comp['2019-2020'] - eval.sum.comp['2018-2019']
+
 }
 ave.excess.baseline.week <- diff.base/nrow(all.deaths.provis.eval.comp)
 ```
