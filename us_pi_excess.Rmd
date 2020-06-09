@@ -40,7 +40,9 @@ knitr::opts_chunk$set(
   message=FALSE,
   comment = "#>",
   dev=c('png','pdf'),
-  fig.path='./figures/'
+  fig.path='./figures/',
+  gganimate = list(
+    nframes = 50)
 )
 
 extrap.date <-  as.Date(params$extrap.date)
@@ -82,6 +84,8 @@ library(abind)
 library(gsubfn)
 library(dplyr)
 library(RCurl)
+library(gifski)
+library(gganimate)
 #library(jsonlite)
 set.seed(123)
 source('./functions/ts_plot_func.R')
@@ -1404,6 +1408,28 @@ title(xlab = "Date",
 ```
 
 
+```{r,  eval=F}
+#Correlation between testing and gap between excess deaths and covid-reported deaths over time
+
+jh3.trim2 <- jh3.trim
+jh3.trim2$log.excess.ratio <-
+  log((jh3.trim$excess_all_cause_deaths+0.5)/(jh3.trim$covid.death.hybrid+0.5))
+
+p <- ggplot(jh3.trim2, aes(x = test.week.per.capita, y = log.excess.ratio)) +
+  geom_point()+
+  theme_bw()+
+  geom_hline(yintercept = 0)
+
+anim <- p +
+  transition_states(week_end_date,
+                    transition_length = 2,
+                    state_length = 1) +
+ ggtitle('Now showing week ending {closest_state}',
+          subtitle = 'Frame {frame} of {nframes}')
+anim
+```
+
+
 ## NCHS vs COVIDtracking.com data
 
 ```{r}
@@ -1415,9 +1441,6 @@ points (st1$week_end_date ,st1$covid.death.hybrid,type='l', col='red')
 legend('topleft', legend=c('Covidtracking', 'NCHS'), lty=1, col=c('black','red'))
 }
 ```
-
-
-
 
 ## Compare Excess all-cause mortality vs Excess ILI
 
