@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "6/5/2020"
+date: "6/12/2020"
 output:
   html_document:
     df_print: paged
@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-05-23'
+  end.data.date: '2020-05-30'
 ---
 
 Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
@@ -873,6 +873,11 @@ denom.check <-
                 syndrome = 'all_deaths',
                 extract.quantity = "denom")
 
+dispersion <-
+    excessExtract(ds = ds,
+                syndrome = 'all_deaths',
+                extract.quantity = "disp")
+
 ##National data is created by summing state data
 sum.pred.iter.ac <-    
   excessExtract(ds = ds,
@@ -1286,6 +1291,66 @@ for(i in plot.state.indices){
   }
 ```
 
+## Time series of observed and expected prior to March 2020
+This is to demonstrate the fit of the model in the pre-pandemic period. Note: the axes do not extend to 0 because these plots are meant to highlight the fit of the model
+```{r fig1.alt, fig.width=8, fig.height=15}
+par(mfrow=c(11,5), mar=c(3,4,2,1))
+
+comb2.spl <- split(comb2, comb2$state)
+
+
+  
+for(i in 1:length(comb2.spl)){
+  
+  ds1 <- comb2.spl[[i]]
+  ds1 <- ds1[ds1$week_end_date < as.Date('2020-03-01'),]
+    y.range1<-range(c(as.matrix( ds1[,c("baseline_all_cause_lower","baseline_all_cause_upper","all_cause_deaths")])), na.rm=T) 
+      state.name.plot <-    
+      state.name2[match(unique(ds1$state),state.abb2)]
+   
+  plot( ds1$week_end_date, ds1$all_cause_deaths,
+       type='l',
+       col='black',
+       ylim=y.range1,
+       bty='l',
+       xlab='',
+       ylab='N deaths',
+     #  xaxt='n',
+       main=state.name.plot
+       )
+  
+  text(x=1,y=y.range1[1], state.name.plot,adj=c(0,0),cex=0.9, xpd=NA)
+
+  points(ds1$week_end_date,
+         ds1$baseline_all_cause,
+         type='l',
+         col='gray')
+  
+  
+ 
+  axis(side=1, at=c(1,14,27,40), labels=c('Jul','Oct','Jan','Apr'))
+    
+  # lpi.miss <- lpi[i,,'2019']
+  # lpi.miss <- lpi.miss[!is.na(lpi.miss)]
+  # 
+  # upi.miss <- upi[i,,'2019']
+  # upi.miss <- upi.miss[!is.na(upi.miss)]
+  
+  x.miss <- ds1$week_end_date[!is.na(ds1$all_cause_deaths)]
+  
+  lpi <- ds1$baseline_all_cause_lower[!is.na(ds1$all_cause_deaths)]
+  
+    upi <- ds1$baseline_all_cause_upper[!is.na(ds1$all_cause_deaths)]
+  
+  polygon(c(x.miss,
+            rev(x.miss)),
+          c(lpi,
+            rev(upi)),
+          col = rgb(1, 0, 0, alpha = 0.2),
+          border = NA)
+  }
+```
+
 ## Observed weekly death rate due to pneumonia/influenza/covid-19 vs seasonal baseline for pneumonia&influenza (+/-95% Prediction Interval) 
  The black line shows the observed proportion of deaths that were due to Pneumonia & Influenza & Covid-19 (P&I&C) per week. The red line and shaded area represent the 95% Prediction Interval. The latest P&I&C data is for the week ending `r  max(dates1)+6`.
  
@@ -1310,6 +1375,7 @@ states <- dimnames(comb2.c)[[1]]
   
 for(i in plot.state.indices){
     y.range1<-range(c( pred[i,,]/denom[i,,],obs[i,,]/denom[i,,], upi[i,,]/denom[i,,] ,0), na.rm=T)
+    y.range1[is.infinite(y.range1)] <-3
     if(states[i] %in% state.abb2 ){
       state.name.plot <-    
       state.name2[match(states[i],state.abb2)]
@@ -1382,7 +1448,7 @@ jh3 <- jh3[!is.na(jh3$week_end_date),]
 ## uses NCHS covid deaths for reported deaths
 jh3.trim <- jh3[jh3$week_end_date<=end.data.date & jh3$week_end_date>=params$count.start.date,]
   par(mfrow=c(2,2), mar=c(2,4,3,1), oma = c(3,3,0,3) + 0.1)
-ts.plot.func(ds.plot=jh3.trim,   states.plot=c('MA','TX','CA','WA'),ylim.adj=15.0 ,death.var="covid.death.hybrid" ,plot.order=T, plot.excess='ac')
+ts.plot.func(ds.plot=jh3.trim,   states.plot=c('MA','TX','CA','MN'),ylim.adj=15.0 ,death.var="covid.death.hybrid" ,plot.order=T, plot.excess='ac')
 title(xlab = "Date",
       ylab = "N Deaths",
       outer = TRUE, line = 1, cex=1.0)
@@ -1586,7 +1652,7 @@ j='2019-2020'
 
 ```{r fig.s1, fig.width=10, fig.height=4}
 par(mfrow=c(1,2))
-for(week.test in c('11','22')){ #week for which CDCfluview is for
+for(week.test in c('11','23')){ #week for which CDCfluview is for
 
 
 provis.list <- lapply(c('2019-2020','2018-2019','2017-2018','2016-2017'),
@@ -1652,7 +1718,7 @@ diff <- all.deaths.provis$`2019-2020` -
 
 all.deaths.provis.eval <-
   all.deaths.provis[all.deaths.provis$Week >=10 &
-                      all.deaths.provis$Week<=21,]
+                      all.deaths.provis$Week<=22,]
 eval.sum <- apply(all.deaths.provis.eval[,-c(1:3)],2,sum)
 eval.sum['2019-2020'] - eval.sum['2018-2019']
 n.weeks.sum <- nrow(all.deaths.provis.eval)
@@ -1926,5 +1992,39 @@ points(nat1$nchs.pic,)
 
 ```
 
+
+## Empirical baseline
+```{r}
+x1 <- read.csv('./outputs/national_and_state_summary.csv')
+
+x1.m <- melt(x1[,c("all_cause_deaths",'year','week','state')],id.vars=c('year','week','state') )
+x1.m <- x1.m[!is.na(x1.m$year),]
+x1.c <- dcast(x1.m, week+state ~year)
+x1.c$ave <- apply(x1.c[c("2015", "2016","2017", "2018", "2019")],1, mean, na.rm=T)
+x1.c$excess.empirical <- x1.c$`2020` - x1.c$ave
+x1.d <- x1.c[c('excess.empirical','week','state')]
+
+
+x2 <- merge(x1.d, x1, by=c( 'week','state'))
+x2$week_end_date <- as.Date(x2$week_end_date)
+x2 <- 
+  x2[x2$week_end_date>=count.start.date & x2$week_end_date <= end.data.date, ]
+plot(x2$excess.empirical, x2$excess_all_cause_deaths)
+abline(a=0, b=1)
+
+sum(x2$excess.empirical)
+sum(x2$excess_all_cause_deaths)
+
+x2.agg <- aggregate(x2[c('excess.empirical','excess_all_cause_deaths')] ,by= list('week_end_date'=x2$week_end_date), FUN=sum)
+```
+
+```{r, fig.width=7, fig.height=5}
+plot(x2.agg$week_end_date, x2.agg$excess.empirical, type='l', col='red', bty='l', lty=2,ylab='Weekly excess deaths', xlab='')
+points(x2.agg$week_end_date,
+     x2.agg$excess_all_cause_deaths, type='l', col='black')
+legend('bottomleft',legend=c('Excess(Empirical baseline)', 'Excess(Modeled baseline)'),box.lty=0, lty=c(2,1), col=c('red','black'), inset=.01 )
+abline(h=0, lty=2, col='gray')
+
+```
 
 

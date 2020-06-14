@@ -91,6 +91,11 @@ wk22 <-
 wk22$max.date.report <- as.Date('2020-05-30')
 wk22$report.date <- as.Date('2020-06-05')
 
+wk23 <- 
+  read.csv('./Archives_FluView_state_data/State_Custom_Data23.csv')
+wk23$max.date.report <- as.Date('2020-06-06')
+wk23$report.date <- as.Date('2020-06-12')
+
 
 #Read in national data
 
@@ -110,7 +115,7 @@ provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','
     })
 nat.reports <- do.call('rbind.data.frame',provis.list)
 
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22)
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22, wk23)
 
 
 all.reports$epiyr <-
@@ -171,6 +176,9 @@ compare.m.alt <-
 compare.m.alt <-
   compare.m.alt[as.numeric((compare.m.alt$report_date - compare.m.alt$death_date)) > 6,]
 
+#Only use death data from Apr 1 onwards to account for changes in reporting during pandemic
+compare.m.alt <- 
+  compare.m.alt[compare.m.alt$death_date >=as.Date('2020-03-29'),]
 
 #Split by state and death date
 compare.m.alt.spl <- 
@@ -455,6 +463,14 @@ prop.report.wk.iter <- sapply(res1,'[[', 'probs.samps', simplify='array')
 complete.wk.iter <- apply(prop.report.wk.iter, c(1,3),function(x) cumsum(exp(x)))
 dimnames(complete.wk.iter)[[1]] <- 2:(dim(complete.wk.iter)[1]+1)
 saveRDS(complete.wk.iter,'./outputs/NobBs.complete.iters.rds')
+
+#this is based on obs/exp from NobBS
+# complete.prop.est.median.df <-
+#   cbind.data.frame(complete.prop.est.iter.df[,1], apply(complete.prop.est.iter.df[,-1],1, median))
+# 
+# complete.wk.iter.median <- apply(complete.wk.iter, c(1,3), median)
+
+
 ```
 
 
@@ -477,10 +493,10 @@ abline(v=as.Date('2020-04-18'), lty=2, col='gray')
 
 ```
 
-#As a check, let's look at the backfilling patterns for certain states
+## As a check, let's look at the backfilling patterns for certain states
 ```{r, fig.width=6, fig.height=8}
 
-check1.m <- melt(compare.m[,c('state','death_date','report_date', 'N_deaths')], id.vars=c('state','death_date','report_date'))
+check1.m <- melt(compare.m.alt[,c('state','death_date','report_date', 'N_deaths')], id.vars=c('state','death_date','report_date'))
 check1.m$time.report <- as.numeric(check1.m$report_date - check1.m$death_date)
 check1.m <- check1.m[check1.m$time.report>7,]
 check1.c <- acast(check1.m, state~death_date~report_date)
@@ -489,7 +505,7 @@ check2 <- check1.c[,dates1 >=as.Date('2020-01-01'),]
 dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
 
 #plot.states <- c('Delaware', 'Louisiana', 'New York', 'Florida')
-plot.states <- c('Delaware', 'Louisiana', 'New York', 'Florida', 'South Carolina','Indiana' )
+plot.states <- c('Delaware', 'Louisiana', 'New York', 'Florida', 'South Carolina','Washington' )
 par(mfrow=c(3,2))
 for(i in plot.states){
   check3 <- check2[i,,]
@@ -499,7 +515,7 @@ dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
   dates2 <- dates1[dates1 >=as.Date('2020-01-01')]
 matplot(dates2 ,check3, type='l', bty='l', xaxt='n', xlab='', ylab='Provisional Count', main=i, ylim=c(0, max(check3, na.rm=T)))
 axis(side=1, at=seq.Date(from=min(dates2), to=max(dates2), length.out=length(dates2)), label=dates2)
-abline(v=as.Date('2020-04-18'))
+abline(v=as.Date('2020-04-01'))
 }
 ```
 
