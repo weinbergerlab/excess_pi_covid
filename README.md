@@ -7,7 +7,7 @@ The goal for these analyses is to estimate excess mortality by state and for the
 
 The code is set up to automatically pull the latest version of data from NCHS. If you want to update regularly, change the option: maxage=hours(9999999)) around line 96. This determiens how often to update the data. E.g., if you want to update the data every 2 days, set this to hours(48). Otherwise, the program will use the most recent vintage of data available.
 
-A snapshot of the repository, as used in the most recent analyses through May 9 can be found here:
+A snapshot of the repository, as used in the most recent analyses through May 30 can be found here:
 [![DOI](https://zenodo.org/badge/252549546.svg)](https://zenodo.org/badge/latestdoi/252549546)
 
 The most recent results can be seen at https://weinbergerlab.github.io/excess_pi_covid/
