@@ -106,7 +106,7 @@ source('./functions/stack_plot.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(0)) {
+runIfExpired <- function(storeName, f, maxage=hours(9999999)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -395,11 +395,11 @@ return(ds1)
   }
 
 nchs.base2.data <- runIfExpired('nchs_base2_data', 
- ~read.csv("https://data.cdc.gov/api/views/r8kw-7aab/rows.csv?accessType=DOWNLOAD") 
+ ~read.csv("https://data.cdc.gov/api/views/muzy-jte6/rows.csv?accessType=DOWNLOAD") 
  )
+nchs.base2.data <- nchs.base2.data[,c("Jurisdiction.of.Occurrence" ,"Week.Ending.Date" ,"All.Cause")]
 
-
-nchs.base2.data <- nchs.base2.data[, c("State","End.Week", 'Total.Deaths'  )]
+names(nchs.base2.data) <- c("State","End.Week", 'Total.Deaths'  )
 
 nchs.base2.data$All.Cause <-
   as.numeric(nchs.base2.data$Total.Deaths)
@@ -417,7 +417,6 @@ nchs.base1.data$week_end <-
 
 nchs.base.comb <-
   bind_rows(nchs.base1.data,nchs.base2.data)
-
 
 #Import the cdcfluview data
 pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
@@ -719,7 +718,7 @@ Excess deaths provide an estimate of full COVID-19 burden and indicate that offi
 #Run analysis
 analysis.data$one <- 1
 analysis.data2 <-
-    analysis.data[!is.na(analysis.data$total_pni),]
+    analysis.data[!is.na(analysis.data$nchs.pic),]
 set.seed(123)
 excess_pi_natl <-
   excessCases(ds = analysis.data2,
