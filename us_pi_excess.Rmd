@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "6/12/2020"
+date: "6/19/2020"
 output:
   html_document:
     df_print: paged
@@ -106,7 +106,7 @@ source('./functions/stack_plot.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(9999999)) {
+runIfExpired <- function(storeName, f, maxage=hours(0)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -385,21 +385,39 @@ names(nchs.base1.data) <-c('state', 'year','week','week_end','all_cause', 'flag_
 #url.nchs.base2 <- "https://data.cdc.gov/resource/muzy-jte6.json"
 #ARCHIVE
 #nchs.base2.data <- runIfExpired('nchs_base2_data', 
-# ~jsonlite::read_json(url.nchs.base2, simplifyVector = T))
-nchs.base2.data <-
-  read.csv('./Data/nchs_base2_data/Weekly_Counts_of_Deaths_by_State_and_Select_Causes__2019-2020.csv')
+# ~jsonlite::read_json(url.nchs.base2, simplifyVector = F))
+#nchs.base2.data <-
+#  read.csv('./Data/nchs_base2_data/Weekly_Counts_of_Deaths_b#y_State_and_Select_Causes__2019-2020.csv')
+csv.url <- "https://data.cdc.gov/api/views/r8kw-7aab/rows.csv?accessType=DOWNLOAD"
+ds.func <- function(url){
+  ds1<- read.csv("https://data.cdc.gov/api/views/r8kw-7aab/rows.csv?accessType=DOWNLOAD") 
+return(ds1)
+  }
 
-nchs.base2.data <- nchs.base2.data[, c("Jurisdiction.of.Occurrence","MMWR.Year", "MMWR.Week","Week.Ending.Date", 'All.Cause' ,"flag_allcause" )]
+nchs.base2.data <- runIfExpired('nchs_base2_data', 
+ ~read.csv("https://data.cdc.gov/api/views/r8kw-7aab/rows.csv?accessType=DOWNLOAD") 
+ )
+
+
+nchs.base2.data <- nchs.base2.data[, c("State","End.Week", 'Total.Deaths'  )]
 
 nchs.base2.data$All.Cause <-
-  as.numeric(nchs.base2.data$All.Cause)
+  as.numeric(nchs.base2.data$Total.Deaths)
 
-names(nchs.base2.data) <-c('state', 'year','week','week_end','all_cause', 'flag_ac')
+names(nchs.base2.data) <-c('state', 'week_end','all_cause')
+
+nchs.base2.data$week_end <- as.Date(nchs.base2.data$week_end, '%m/%d/%Y')
+
+
+nchs.base2.data$all_cause <-
+  as.numeric(nchs.base2.data$all_cause)
+
+nchs.base1.data$week_end <-
+  as.Date(nchs.base1.data$week_end, '%m/%d/%Y')
 
 nchs.base.comb <-
   bind_rows(nchs.base1.data,nchs.base2.data)
 
-nchs.base.comb$week_end <- as.Date(nchs.base.comb$week_end, '%m/%d/%Y')
 
 #Import the cdcfluview data
 pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state'))
@@ -407,7 +425,7 @@ pi.data <- runIfExpired('pi_mortality_state', ~pi_mortality(coverage_area='state
 pi.data <- pi.data[pi.data$coverage_area=='state',c('week_end','percent_pni' ,'region_name')]
 names(pi.data) <-c('week_end',"percent_pni",'region_name')
 
-pi.data <- merge(nchs.base.comb, pi.data, by.x=c('state','week_end'), by.y=c('region_name','week_end'), all=T)
+pi.data <- merge(nchs.base.comb[,c('state','week_end','all_cause')], pi.data, by.x=c('state','week_end'), by.y=c('region_name','week_end'), all=T)
 
 #estimated P&I deaths from %P&I and N all deaths
 pi.data$pi.fv <-
@@ -440,20 +458,26 @@ pi.data.not.miss.states <-
 #url.cdc.covid<-"https://data.cdc.gov/resource/hc4f-j6nb.json" #no longer being updated as of Apr 30
 
 #Updated week days
-url.cdc.covid <- "https://data.cdc.gov/resource/r8kw-7aab.json"
+#url.cdc.covid <- "https://data.cdc.gov/resource/r8kw-7aab.json"
 #ARCHIVE
+#cdc.data <- runIfExpired('cdc_covid_data', 
+# ~jsonlite::read_json(url.cdc.covid, simplifyVector = T))
 cdc.data <- runIfExpired('cdc_covid_data', 
- ~jsonlite::read_json(url.cdc.covid, simplifyVector = T))
+ ~read.csv("https://data.cdc.gov/api/views/r8kw-7aab/rows.csv?accessType=DOWNLOAD")
+   )
+
 
 names(cdc.data) <- 
   c('data_as_of','start_week', 'end_week', 'group', 'state','indicator','nchs.covid.deaths','nchs.total.deaths','percent_complete', 'nchs.pneu.death','nchs.pneum.w.covid','nchs.flu.death','nchs.pic')
 
 cdc.data$start_week <- NULL
 
-data.vintage <- as.Date(substr(unique(cdc.data$data_as_of),1,10))
+data.vintage <- as.Date(unique(cdc.data$data_as_of),'%m/%d/%Y')
 
 cdc.data$end_week <-
-  as.Date(substr(cdc.data$end_week,1,10))
+  as.Date(cdc.data$end_week,'%m/%d/%Y')
+cdc.data$data_as_of <-
+  as.Date(cdc.data$data_as_of,'%m/%d/%Y')
 
 most.recent <- max(cdc.data$data_as_of)
 cdc.data <- cdc.data[cdc.data$data_as_of==most.recent,]
@@ -496,11 +520,11 @@ names(natl.pi.data) <- c('week_end','year_week_num','total_pni','all_deaths','st
 
 
 state.pi.data <-
-  pi.data[,c('week_end','week','pi.fv','all_cause','state')]
-names(state.pi.data) <- c('week_end','year_week_num','total_pni','all_deaths','state')
+  pi.data[,c('week_end','pi.fv','all_cause','state')]
+names(state.pi.data) <- c('week_end','total_pni','all_deaths','state')
 
 pi.data.combined <- 
-  rbind.data.frame(state.pi.data, natl.pi.data)
+  bind_rows(state.pi.data, natl.pi.data)
 
 pi.data.combined <-
   pi.data.combined[pi.data.combined$week_end >=as.Date('2015-01-05'),]
@@ -995,7 +1019,7 @@ nat.range.ac2$covid.death.hybrid[is.na(nat.range.ac2$covid.death.hybrid)] <-0
 
 nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 
-stack_plot_func(nat.range.ac2, scale.plot=1.3,legend.loc='bottomleft')
+stack_plot_func(nat.range.ac2, scale.plot=1.3,legend.loc='bottomleft',set.ymax=max(nat.range.ac2$obs))
 
 ```
 
@@ -1048,16 +1072,16 @@ Excess deaths for four states that had large numbers of reported COVID-19 deaths
 ```{r jama.im.fig3, fig.width=8, fig.height=6.5}
 fig.scaling=1
 par(mfrow=c(2,2), mar=c(2,4,2,1))
-stack_plot_func(nat.range.ac2.spl[['NJ']], legend=F,scale.plot=fig.scaling, set.ymax = 4500)
+stack_plot_func(nat.range.ac2.spl[['NJ']], legend=F,scale.plot=fig.scaling, set.ymax = 4700)
 title("New Jersey")
 
-stack_plot_func(nat.range.ac2.spl[['IL']], legend=F,scale.plot=fig.scaling, set.ymax = 4500)
+stack_plot_func(nat.range.ac2.spl[['IL']], legend=F,scale.plot=fig.scaling, set.ymax = 4700)
 title("Illinois")
 
-stack_plot_func(nat.range.ac2.spl[['MI']], legend=T,scale.plot=fig.scaling, set.ymax = 4500,legend.loc='bottomleft')
+stack_plot_func(nat.range.ac2.spl[['MI']], legend=T,scale.plot=fig.scaling, set.ymax = 4700,legend.loc='bottomleft')
 title("Michigan")
 
-stack_plot_func(nat.range.ac2.spl[['MA']], legend=F,scale.plot=fig.scaling, set.ymax = 4500)
+stack_plot_func(nat.range.ac2.spl[['MA']], legend=F,scale.plot=fig.scaling, set.ymax = 4700)
 title("Massachusetts")
 
 ```
@@ -1477,11 +1501,13 @@ title(xlab = "Date",
 ```{r,  eval=F}
 #Correlation between testing and gap between excess deaths and covid-reported deaths over time
 
-jh3.trim2 <- jh3.trim
+jh3.trim2 <- jh3.trim[jh3.trim$week_end_date<=as.Date('2020-05-01'),]
 jh3.trim2$log.excess.ratio <-
-  log((jh3.trim$excess_all_cause_deaths+0.5)/(jh3.trim$covid.death.hybrid+0.5))
+  log((jh3.trim2$excess_all_cause_deaths+0.5)/(jh3.trim2$covid.death.hybrid+0.5))
 
-p <- ggplot(jh3.trim2, aes(x = test.week.per.capita, y = log.excess.ratio)) +
+jh3.trim2$tests.excess <- sqrt(jh3.trim2$testN/jh3.trim2$excess_all_cause_deaths)
+
+p <- ggplot(jh3.trim2, aes(x = tests.excess, y = log.excess.ratio)) +
   geom_point()+
   theme_bw()+
   geom_hline(yintercept = 0)
@@ -1493,6 +1519,8 @@ anim <- p +
  ggtitle('Now showing week ending {closest_state}',
           subtitle = 'Frame {frame} of {nframes}')
 anim
+
+anim_save("filenamehere.gif", anim)
 ```
 
 
@@ -1853,7 +1881,9 @@ nrevvs.m <- melt(nrevvs.combo2[,c("flu_pct_adj",'state',"mmwr_week","mmwr_year")
 nrevvs.c <- acast(nrevvs.m, mmwr_week~mmwr_year~state)
 
 us.nv <- nrevvs.c[,,'NY']
-matplot(us.nv[1:17,], type='l')
+col.plot <- c(rep('gray',5), 'red')
+
+matplot(us.nv[1:23,], type='l', col=col.plot, bty='l', ylab='Positive flu tests')
 #NB: looking at flu hospitalizations, which are lab confirmed from FluSurvNet gives a very similar picture of historically low flu levels in 2020)
 ```
 

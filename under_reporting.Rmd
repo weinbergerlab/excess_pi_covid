@@ -96,11 +96,16 @@ wk23 <-
 wk23$max.date.report <- as.Date('2020-06-06')
 wk23$report.date <- as.Date('2020-06-12')
 
+wk24 <- 
+  read.csv('./Archives_FluView_state_data/State_Custom_Data24.csv')
+wk24$max.date.report <- as.Date('2020-06-13')
+wk24$report.date <- as.Date('2020-06-19')
+
 
 #Read in national data
 
 
-provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22'),
+provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23'),
                       function(x){
   d1 <- read.csv(paste0('./Data/provisional_pi/provisional', '2019-2020','_','week_',x,'.csv'))
   names(d1) <- toupper(names(d1))
@@ -115,7 +120,7 @@ provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','
     })
 nat.reports <- do.call('rbind.data.frame',provis.list)
 
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22, wk23)
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22, wk23,wk24)
 
 
 all.reports$epiyr <-
