@@ -1210,7 +1210,7 @@ htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to CO
 ```
 
 ## Observed weekly death rate due to any cause vs seasonal baseline (+/-95% Prediction Interval) 
-The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest data are for the week ending `r  max(dates1)+6`.
+The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest data are for the week ending `r  max(dates1)+6`. The gray shaded area shows the excess deaths (observed -median of the baseline)
 
 ```{r recast_summary_data}
 #recast the summary data as an array
@@ -1283,7 +1283,6 @@ for(i in plot.state.indices){
        xaxt='n'
        )
   
-  text(x=1,y=0, state.name.plot,adj=c(0,0),cex=0.9, xpd=NA)
 
   for(j in 1:dim(obs)[3]){
     points(1:52,
@@ -1311,7 +1310,20 @@ for(i in plot.state.indices){
             rev(upi.miss)),
           col = rgb(1, 0, 0, alpha = 0.2),
           border = NA)
+  
+#points (1:52, (obs[i,,'2019'] - pred[i,,'2019']), lty=2 , type='l')
+excess <- obs[i,,'2019'] - pred[i,,'2019']
+polygon(c(1:length(upi.miss),
+            rev(1:length(upi.miss))),
+          c(rep(0,length(upi.miss) ),
+            rev(excess[1:length(upi.miss)])),
+          col = rgb(0, 0, 0, alpha = 0.2),
+          border = NA)
+
+  text(x=1,y=10, state.name.plot,adj=c(0,0),cex=0.9, xpd=NA)
+
   }
+
 ```
 
 ## Time series of observed and expected prior to March 2020
