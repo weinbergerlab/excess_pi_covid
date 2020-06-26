@@ -101,26 +101,13 @@ wk24 <-
 wk24$max.date.report <- as.Date('2020-06-13')
 wk24$report.date <- as.Date('2020-06-19')
 
+wk25 <- 
+  read.csv('./Archives_FluView_state_data/State_Custom_Data25.csv')
+wk25$max.date.report <- as.Date('2020-06-20')
+wk25$report.date <- as.Date('2020-06-26')
 
-#Read in national data
 
-
-provis.list <- lapply(c('01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23'),
-                      function(x){
-  d1 <- read.csv(paste0('./Data/provisional_pi/provisional', '2019-2020','_','week_',x,'.csv'))
-  names(d1) <- toupper(names(d1))
-  d1$week.death <- MMWRweek2Date(d1$YEAR, d1$WEEK) + days (6)
-  d1$max.date.report <- max(d1$week.death)
- # d1$report.date <- d1$max.date.report + days(12)
-  d1$report.date <- mmwr_week_to_date(2020,week= as.numeric(x))+ days(12)
-  d1$SUB.AREA <- 'US'
-  d1$epiyr <- d1$YEAR
-  d1$epiyr[d1$WEEK<=26] <- d1$YEAR[d1$WEEK<=26] - 1
-  return(d1)
-    })
-nat.reports <- do.call('rbind.data.frame',provis.list)
-
-all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22, wk23,wk24)
+all.reports <- rbind.data.frame(wk11,wk12,wk13,wk15, wk16, wk17, wk18, wk19, wk20, wk21, wk22, wk23,wk24, wk25)
 
 
 all.reports$epiyr <-
@@ -145,11 +132,7 @@ all.reports$TOTAL.DEATHS <-
   gsub(',','',all.reports$TOTAL.DEATHS) 
 all.reports$TOTAL.DEATHS <-  as.numeric(as.character(all.reports$TOTAL.DEATHS))
 
-nat.reports2 <- 
-  nat.reports[, c('week.death','SUB.AREA','report.date', 'ALL.DEATHS')]
-names(nat.reports2) <- c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS")
-
-all.reports2 <- rbind.data.frame(all.reports[,c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS") ], nat.reports2)
+all.reports2 <- all.reports[,c("week.death","SUB.AREA" ,"report.date","TOTAL.DEATHS") ]
 ```
 
 ```{r}

@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "6/19/2020"
+date: "6/26/2020"
 output:
   html_document:
     df_print: paged
@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-06-06'
+  end.data.date: '2020-06-13'
 ---
 
 Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
@@ -399,14 +399,14 @@ nchs.base2.data <- runIfExpired('nchs_base2_data',
  )
 nchs.base2.data <- nchs.base2.data[,c("Jurisdiction.of.Occurrence" ,"Week.Ending.Date" ,"All.Cause")]
 
-names(nchs.base2.data) <- c("State","End.Week", 'Total.Deaths'  )
+names(nchs.base2.data) <- c("State","week_end", 'Total.Deaths'  )
 
-nchs.base2.data$All.Cause <-
+nchs.base2.data$Total.Deaths <-
   as.numeric(nchs.base2.data$Total.Deaths)
 
 names(nchs.base2.data) <-c('state', 'week_end','all_cause')
 
-nchs.base2.data$week_end <- as.Date(nchs.base2.data$week_end, '%m/%d/%Y')
+nchs.base2.data$week_end <- as.Date(nchs.base2.data$week_end)
 
 
 nchs.base2.data$all_cause <-
@@ -718,7 +718,11 @@ Excess deaths provide an estimate of full COVID-19 burden and indicate that offi
 #Run analysis
 analysis.data$one <- 1
 analysis.data2 <-
-    analysis.data[!is.na(analysis.data$nchs.pic),]
+    analysis.data[!is.na(analysis.data$nchs.pic),c('week_end','state','nchs.total.deaths','nchs.pic','log.flu.deseasonalize.0','one')]
+analysis.data2 <- analysis.data2[order(analysis.data2$state, analysis.data2$week_end),]
+
+#analysis.data2<- analysis.data2[analysis.data2$state %in% c('NYC','NY',"MA"),]
+
 set.seed(123)
 excess_pi_natl <-
   excessCases(ds = analysis.data2,
@@ -1210,7 +1214,7 @@ htmlTable(excess.combined2, caption=paste0('Observed and Excess deaths due to CO
 ```
 
 ## Observed weekly death rate due to any cause vs seasonal baseline (+/-95% Prediction Interval) 
-The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest data are for the week ending `r  max(dates1)+6`. The gray shaded area shows the excess deaths (observed -median of the baseline)
+The black line shows the observed proportion of deaths that were due to any cause per week. The red line and shaded area represent the 95% Prediction Interval. The latest data are for the week ending `r  max(dates1)+6`. The gray shaded area shows the excess deaths (observed -median of the baseline). States are ordered based on total number of excess deaths.
 
 ```{r recast_summary_data}
 #recast the summary data as an array
@@ -1251,8 +1255,13 @@ comb2.c <- acast(comb2.m, state~epiweek~epiyr~variable )
 par(mfrow=c(5,4), mar=c(2,4,2,1))
 rr <- t(comb2.c[,,'2019','rr.ac'])
 rr <- rr[complete.cases(rr),]
-plot.state.rank <- cbind.data.frame(state.index=1:dim(rr)[2],state.rank= rank(-rr[dim(rr)[1],]))
+
+excess1 <- comb2.c[,,'2019',"excess_all_cause_deaths"]
+excess1.sum <- apply(excess1,1, sum, na.rm=T)
+plot.state.rank <- cbind.data.frame(state.index=1:length(excess1.sum),state.rank= rank(-excess1.sum))
+
 plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
+
 plot.state.indices <- plot.state.rank$state.index
 
 pred <- comb2.c[,,,"baseline_all_cause"  ]
