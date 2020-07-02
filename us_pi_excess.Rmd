@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-06-13'
+  end.data.date: '2020-06-20'
 ---
 
 Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
@@ -406,7 +406,7 @@ nchs.base2.data$Total.Deaths <-
 
 names(nchs.base2.data) <-c('state', 'week_end','all_cause')
 
-nchs.base2.data$week_end <- as.Date(nchs.base2.data$week_end)
+nchs.base2.data$week_end <- as.Date(nchs.base2.data$week_end, '%m/%d/%Y')
 
 
 nchs.base2.data$all_cause <-
