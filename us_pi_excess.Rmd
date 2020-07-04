@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "6/26/2020"
+date: "7/3/2020"
 output:
   html_document:
     df_print: paged
