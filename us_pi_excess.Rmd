@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "7/17/2020"
+date: "7/24/2020"
 output:
   html_document:
     df_print: paged
@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-07-04'
+  end.data.date: '2020-07-11'
 ---
 
 Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
@@ -1227,12 +1227,12 @@ comb2.trim$rr.ac <-
   comb2.trim$all_cause_deaths/comb2.trim$baseline_all_cause
 
 comb2.trim <- comb2.trim[!is.na(comb2.trim$week),]
-comb2.trim$epiweek <- NA
-comb2.trim$epiweek[comb2.trim$week<=26] <-
-  comb2.trim$week[comb2.trim$week<=26] +26
-
-comb2.trim$epiweek[comb2.trim$week>=27] <-
-  comb2.trim$week[comb2.trim$week>=27] -26
+#comb2.trim$epiweek <- NA
+# comb2.trim$epiweek[comb2.trim$week<=26] <-
+#   comb2.trim$week[comb2.trim$week<=26] +26
+# 
+# comb2.trim$epiweek[comb2.trim$week>=27] <-
+#   comb2.trim$week[comb2.trim$week>=27] -26
 
 comb2.trim$epiyr <- NA
 comb2.trim$epiyr <- comb2.trim$year
@@ -1245,8 +1245,12 @@ comb2.trim$date <-NULL
 comb2.trim$week_start_date <-NULL
 
 
-comb2.m <- melt(comb2.trim, id.vars=c('state','epiweek','epiyr'))
-comb2.c <- acast(comb2.m, state~epiweek~epiyr~variable )
+comb2.m <- melt(comb2.trim, id.vars=c('state','week','year'))
+comb2.c <- acast(comb2.m, state~week~year~variable )
+
+present.weeks <- which(!is.na(comb2.c['NY',,'2020',"all_cause_deaths" ]))
+
+comb2.c <- comb2.c[,present.weeks,,]
 
 #nat.index <- which(dimnames(comb2.c)[[1]]=='US')
 #comb2.c <- comb2.c[-nat.index,,,]
@@ -1255,10 +1259,10 @@ comb2.c <- acast(comb2.m, state~epiweek~epiyr~variable )
 
 ```{r fig1, fig.width=7.3, fig.height=6.9}
 par(mfrow=c(5,4), mar=c(2,4,2,1))
-rr <- t(comb2.c[,,'2019','rr.ac'])
+rr <- t(comb2.c[,,'2020','rr.ac'])
 rr <- rr[complete.cases(rr),]
 
-excess1 <- comb2.c[,,'2019',"excess_all_cause_deaths"]
+excess1 <- comb2.c[,,'2020',"excess_all_cause_deaths"]
 excess1.sum <- apply(excess1,1, sum, na.rm=T)
 plot.state.rank <- cbind.data.frame(state.index=1:length(excess1.sum),state.rank= rank(-excess1.sum))
 
@@ -1283,8 +1287,8 @@ for(i in plot.state.indices){
     }else{
     state.name.plot <- states[i]
   }
-  plot( 1:52,
-       pred[i,,'2019'],
+  plot( 1:length(present.weeks),
+       pred[i,,'2020'],
        type='l',
        col='red',
        ylim=y.range1,
@@ -1296,23 +1300,23 @@ for(i in plot.state.indices){
   
 
   for(j in 1:dim(obs)[3]){
-    points(1:52,
+    points(1:length(present.weeks),
          obs[i,,j],
          type='l',
          col='gray')
   }
   
-    points(1:52,
-         obs[i,,'2019'],
+    points(1:length(present.weeks),
+         obs[i,,'2020'],
          type='l',
          col='black')
     
-  axis(side=1, at=c(1,14,27,40), labels=c('Jul','Oct','Jan','Apr'))
+  axis(side=1, at=c(1,14,27,40), labels=c('Jan','Apr','Jul','Oct'))
     
-  lpi.miss <- lpi[i,,'2019']
+  lpi.miss <- lpi[i,,'2020']
   lpi.miss <- lpi.miss[!is.na(lpi.miss)]
   
-  upi.miss <- upi[i,,'2019']
+  upi.miss <- upi[i,,'2020']
   upi.miss <- upi.miss[!is.na(upi.miss)]
   
   polygon(c(1:length(upi.miss),
@@ -1322,8 +1326,7 @@ for(i in plot.state.indices){
           col = rgb(1, 0, 0, alpha = 0.2),
           border = NA)
   
-#points (1:52, (obs[i,,'2019'] - pred[i,,'2019']), lty=2 , type='l')
-excess <- obs[i,,'2019'] - pred[i,,'2019']
+excess <- obs[i,,'2020'] - pred[i,,'2020']
 polygon(c(1:length(upi.miss),
             rev(1:length(upi.miss))),
           c(rep(0,length(upi.miss) ),
@@ -1403,7 +1406,7 @@ for(i in 1:length(comb2.spl)){
 ```{r fig2, fig.width=7.3, fig.height=6.9}
 
 par(mfrow=c(5,4), mar=c(2,4,2,1))
-rr <- t(comb2.c[,,'2019','rr.pic'])
+rr <- t(comb2.c[,,'2020','rr.pic'])
 rr <- rr[complete.cases(rr),]
 plot.state.rank <- cbind.data.frame(state.index=1:dim(rr)[2],state.rank= rank(-rr[dim(rr)[1],]))
 plot.state.rank <- plot.state.rank[order(plot.state.rank$state.rank),]
@@ -1428,40 +1431,42 @@ for(i in plot.state.indices){
     }else{
     state.name.plot <- states[i]
   }
-  plot( 1:52,
-       pred[i,,'2019']/denom[i,,'2019'],
+  plot( 1:length( pred[i,,'2020']),
+       pred[i,,'2020']/denom[i,,'2020'],
        type='l',
        col='red',
-       ylim=y.range1,
+       #ylim=y.range1,
        bty='l',
        xlab='',
        ylab='Proportion',
+       ylim=c(0,0.5),
        xaxt='n'
        )
   
-  text(x=1,y=y.range1[2], state.name.plot, pos=4,cex=0.9, xpd=NA)
+  #text(x=1,y=y.range1[2], state.name.plot, pos=4,cex=0.9, xpd=NA)
+  text(x=1,y=0.5, state.name.plot, pos=4,cex=0.9, xpd=NA)
 
   for(j in 1:dim(obs)[3]){
-    points(1:52,
+    points(1:length(obs[i,,'2020']),
          obs[i,,j]/denom[i,,j],
          type='l',
          col='gray')
   }
   
-    points(1:52,
-         obs[i,,'2019']/denom[i,,'2019'],
+    points(1:length(obs[i,,'2020']),
+         obs[i,,'2020']/denom[i,,'2020'],
          type='l',
          col='black')
     
-  axis(side=1, at=c(1,14,27,40), labels=c('Jul','Oct','Jan','Apr'))
+  axis(side=1, at=c(1,14,27,40), labels=c('Jan','Apr','Jul','Oct'))
     
-  lpi.miss <- lpi[i,,'2019']
+  lpi.miss <- lpi[i,,'2020']
   lpi.miss <- lpi.miss[!is.na(lpi.miss)]
   
-  upi.miss <- upi[i,,'2019']
+  upi.miss <- upi[i,,'2020']
   upi.miss <- upi.miss[!is.na(upi.miss)]
   
-  denom.miss <- denom[i,,'2019']
+  denom.miss <- denom[i,,'2020']
   denom.miss <- denom.miss[!is.na(denom.miss)]
   polygon(c(1:length(upi.miss),
             rev(1:length(upi.miss))),
