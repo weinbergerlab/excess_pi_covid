@@ -1599,6 +1599,7 @@ excess_cases1 <-
               extend.epiyear=TRUE,
               time.res='week')
 
+
 dates.ili <-
   excess_cases1[[1]][[1]][[1]]$date
   
@@ -1618,8 +1619,8 @@ rr.ili2 <- rr.ili[mmwr.epiyr.ili==2019,,1]
 ```
 
 ```{r}
-rr.state.pic <- t(comb2.c[,,'2019','rr.pic'])
-rr.state.ac <- t(comb2.c[,,'2019','rr.ac'])
+rr.state.pic <- t(comb2.c[,,'2020','rr.pic'])
+rr.state.ac <- t(comb2.c[,,'2020','rr.ac'])
 
 ```
 
@@ -1643,7 +1644,7 @@ plot.state.indices <- which(dimnames(rr.common.states)[[2]] %in% (c("NYC",jama.s
 
 dates1 <- unique(comb2[,c("week_end_date" ,'year','week')])
 
-dates.plot4 <- seq.Date(from=dates1$week_end_date[dates1$year==2019 & dates1$week==27][1], length.out=52, by='week')
+dates.plot4 <- seq.Date(from=dates1$week_end_date[dates1$year==2020 & dates1$week==1][1], length.out=nrow(rr.state.ac), by='week')
 
 
 par(mfrow=c(2,2), mar=c(2,4,2,2))
@@ -1670,7 +1671,72 @@ for(i in plot.state.indices){
        ylab='Observed/Expected'
        #main=common.states[i]
        )
-    axis(1, at=as.Date(c('2020-03-01', '2020-04-01', '2020-05-01')) , labels= c('Mar','Apr','May')  )
+    axis(1, at=as.Date(c('2020-03-01', '2020-05-01', '2020-07-01','2020-09-01')) , labels= c('Mar','May', 'July', 'September')  )
+
+      points(dates.plot4[1:nrow(rr2.ili.comp)]         ,
+       exp(rr2.ili.comp[,i]), type='l', col='#377eb8', lty=2)
+    abline(h=1, col='gray', lty=2)
+    
+    text(as.Date('2020-03-01'), y=0.2, state.name.plot,pos=4, cex=0.9, offset=0.1, xpd=NA)
+
+if(i==plot.state.indices[1]){
+  legend('topleft', legend=c('Outpatient ILI','Excess deaths'), 
+           col=c('#377eb8','#e41a1c'),
+           inset=0.01, lty=c(1,3,2),box.lty=0 ,lwd=c(1,2),
+           bg="transparent", cex = 1)
+}
+    
+}
+
+```
+
+```{r fig4.more, fig.width=7.3, fig.height=6}
+common.states <- 
+  intersect(colnames(rr.state.ac), colnames(rr.ili2) )
+
+rr.common.states <- rr.state.ac[,common.states]
+n.nonmiss <- sum(!is.na(rr.common.states[,1]))
+rr2.comp <-rr.common.states
+rr2.ili.comp <- rr.ili2[,common.states]
+plot.state.rank <-
+  cbind.data.frame(state.index=1:dim(rr.common.states)[2],state.rank= rank(-rr.common.states[n.nonmiss,]))
+
+plot.state.rank <-
+  plot.state.rank[order(plot.state.rank$state.rank),]
+#plot.state.indices <- plot.state.rank$state.index
+ 
+plot.state.indices <- which(dimnames(rr.common.states)[[2]] %in% (c("AZ",'CA','TX','SC' )))
+
+dates1 <- unique(comb2[,c("week_end_date" ,'year','week')])
+
+dates.plot4 <- seq.Date(from=dates1$week_end_date[dates1$year==2020 & dates1$week==1][1], length.out=nrow(rr.state.ac), by='week')
+
+
+par(mfrow=c(2,2), mar=c(2,4,2,2))
+
+for(i in plot.state.indices){
+    y.range1<-c(0,3)
+    if(dimnames(rr.common.states)[[2]][i] %in% state.abb2 ){
+      state.name.plot <-    
+      state.name2[match(dimnames(rr.common.states)[[2]][i],state.abb2)]
+    }else{
+    state.name.plot <- dimnames(rr.common.states)[[2]][i]
+    }
+    
+    plot(dates.plot4         ,
+       rr2.comp[,i],
+       type='l',
+       col='#e41a1c',
+       ylim=y.range1,
+       xlim=c(as.Date(c('2020-03-01')),max(pi.data$week_end)),
+       bty='l',
+       lty=1,
+       xlab='',
+       xaxt='n',
+       ylab='Observed/Expected'
+       #main=common.states[i]
+       )
+    axis(1, at=as.Date(c('2020-03-01', '2020-05-01', '2020-07-01','2020-09-01')) , labels= c('Mar','May', 'July', 'September')  )
 
       points(dates.plot4[1:nrow(rr2.ili.comp)]         ,
        exp(rr2.ili.comp[,i]), type='l', col='#377eb8', lty=2)
