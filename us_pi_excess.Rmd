@@ -1,7 +1,7 @@
 ---
 title: "Estimating the early death toll of COVID-19 in the United States"
 author: ""
-date: "8/28/2020"
+date: "9/4/2020"
 output:
   html_document:
     df_print: paged
@@ -20,7 +20,7 @@ params:
   web.version: FALSE
   extrap.date: '2020-01-26'
   count.start.date: '2020-03-01'
-  end.data.date: '2020-08-15'
+  end.data.date: '2020-08-22'
 ---
 
 Dan Weinberger,^1^  Jenny Chen,^7^ Ted Cohen,^1^  Forrest W. Crawford,^2^  Farzad Mostashari,^3^  Don Olson,^4^  Virginia E Pitzer,^1^  Nicholas G Reich,^5^  Marcus Russi,^1^ Lone Simonsen,^6^ Annie Watkins,^1^ Cecile Viboud^7^
@@ -106,7 +106,7 @@ source('./functions/stack_plot.R')
 #   functions.
 # @param maxage How old can any existing archived file be before \code{f} is 
 #   called again?
-runIfExpired <- function(storeName, f, maxage=hours(9999999)) {
+runIfExpired <- function(storeName, f, maxage=hours(0)) {
   basepath <- "Data/"
   mostRecent <- mostRecentTimestamp(storeName, basepath=basepath)
   f <- rlang::as_function(f)
@@ -1029,6 +1029,17 @@ nat.range.ac2$week_end <- nat.range.ac2$week_start +days(6)
 stack_plot_func(nat.range.ac2, scale.plot=1.3,legend.loc='bottomleft',set.ymax=max(nat.range.ac2$obs))
 
 ```
+
+Alternative plot
+```{r}
+subs <- nat.range.ac2[nat.range.ac2$week_end>='2020-01-01',]
+subs$excess <- subs$obs-subs$pred
+plot(subs$week_end, subs$excess, type='l', bty='l', ylab="Deaths", xlab='')
+points(subs$week_end, subs$covid.death.hybrid, type='l', col='red')
+
+plot(subs$week_end, subs$covid.death.hybrid/subs$excess, ylim=c(0,1))
+```
+
 
 ```{r, eval=F}
 #Excess/Covid over time
